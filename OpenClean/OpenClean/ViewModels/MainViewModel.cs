@@ -8,7 +8,8 @@ public enum AppSection
     Uebersicht,
     System,
     Bereinigung,
-    Autostart
+    Autostart,
+    Privatsphaere
 }
 
 /// <summary>
@@ -21,6 +22,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public CleanerViewModel Cleaner { get; } = new();
     public StartupViewModel Startup { get; } = new();
+    public PrivacyViewModel Privacy { get; } = new();
     public DashboardViewModel Dashboard { get; }
 
     public MainViewModel()

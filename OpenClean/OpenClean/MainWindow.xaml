@@ -102,6 +102,16 @@
                             <TextBlock Text="Autostart" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavPrivacy" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Privatsphaere}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M12 2 L20 5 L20 11 C20 16 16 20 12 22 C8 20 4 16 4 11 L4 5 Z" />
+                            <TextBlock Text="Privatsphäre" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -116,6 +126,8 @@
                                Visibility="{Binding IsChecked, ElementName=NavCleaner, Converter={StaticResource BoolToVis}}" />
             <views:StartupView DataContext="{Binding Startup}"
                                Visibility="{Binding IsChecked, ElementName=NavStartup, Converter={StaticResource BoolToVis}}" />
+            <views:PrivacyView DataContext="{Binding Privacy}"
+                               Visibility="{Binding IsChecked, ElementName=NavPrivacy, Converter={StaticResource BoolToVis}}" />
         </Grid>
     </Grid>
 </Window>

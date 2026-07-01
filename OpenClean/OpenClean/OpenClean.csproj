@@ -9,7 +9,14 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
-        <Version>0.1.0</Version>
+        <Version>0.5.0</Version>
     </PropertyGroup>
+
+    <ItemGroup>
+        <!-- SQLite-Zugriff für Browser-Datenbanken (Verlauf, Cookies) -->
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
+        <!-- Transitive Abhängigkeit auf die gefixte Version anheben (GHSA-2m69-gcr7-jv3q). -->
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+    </ItemGroup>
 
 </Project>
