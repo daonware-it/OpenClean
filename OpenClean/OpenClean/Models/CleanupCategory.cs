@@ -1,0 +1,75 @@
+using System.Collections.ObjectModel;
+using OpenClean.ViewModels;
+
+namespace OpenClean.Models;
+
+/// <summary>
+/// Art des Löschvorgangs für eine Kategorie.
+/// </summary>
+public enum CleanupKind
+{
+    /// <summary>Einzelne Dateien/Ordner löschen (Standard).</summary>
+    FileDeletion,
+    /// <summary>Papierkorb über die Shell-API leeren (keine direkte Dateilöschung).</summary>
+    RecycleBin
+}
+
+/// <summary>
+/// Eine Bereinigungskategorie (z. B. "Windows-Temp") mit ihren gefundenen Items.
+/// </summary>
+public sealed class CleanupCategory : ViewModelBase
+{
+    public required string Name { get; init; }
+    public required string Description { get; init; }
+    public CleanupKind Kind { get; init; } = CleanupKind.FileDeletion;
+
+    /// <summary>Ob diese Kategorie überhaupt gescannt werden soll.</summary>
+    private bool _isEnabled = true;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => SetProperty(ref _isEnabled, value);
+    }
+
+    public ObservableCollection<ScanItem> Items { get; } = new();
+
+    public long TotalBytes => Items.Sum(i => i.SizeBytes);
+    public long SelectedBytes => Items.Where(i => i.IsSelected).Sum(i => i.SizeBytes);
+    public int SelectedCount => Items.Count(i => i.IsSelected);
+
+    public string HeaderDisplay =>
+        Items.Count == 0
+            ? $"{Name}"
+            : $"{Name} — {SelectedCount}/{Items.Count} Dateien, {Services.ByteFormatter.Format(SelectedBytes)}";
+
+    /// <summary>Tri-State-Auswahl auf Kategorie-Ebene (für die "Alle"-Checkbox).</summary>
+    public bool? AllSelected
+    {
+        get
+        {
+            if (Items.Count == 0) return false;
+            int sel = SelectedCount;
+            if (sel == 0) return false;
+            if (sel == Items.Count) return true;
+            return null;
+        }
+        set
+        {
+            bool target = value ?? false;
+            foreach (var item in Items)
+                item.IsSelected = target;
+            RefreshTotals();
+        }
+    }
+
+    public void Reset() => Items.Clear();
+
+    public void RefreshTotals()
+    {
+        OnPropertyChanged(nameof(TotalBytes));
+        OnPropertyChanged(nameof(SelectedBytes));
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(HeaderDisplay));
+        OnPropertyChanged(nameof(AllSelected));
+    }
+}

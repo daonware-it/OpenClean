@@ -1,0 +1,121 @@
+<Window x:Class="OpenClean.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OpenClean"
+        xmlns:views="clr-namespace:OpenClean.Views"
+        mc:Ignorable="d"
+        Title="OpenClean" Height="760" Width="1180"
+        MinHeight="620" MinWidth="980"
+        Background="{DynamicResource BgBrush}"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource AppFont}">
+    <Window.Resources>
+        <views:EnumToBoolConverter x:Key="EnumToBool" />
+    </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="248" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ================= Sidebar ================= -->
+        <Border Grid.Column="0" Background="{DynamicResource BgDeepBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Brand -->
+                <StackPanel DockPanel.Dock="Top" Margin="22,26,20,20">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentBrush}"
+                                VerticalAlignment="Center">
+                            <Path Data="M 0,6 L 4,10 L 12,0" Stroke="#FF10261F" StrokeThickness="2.4"
+                                  Stretch="Uniform" Margin="8" StrokeEndLineCap="Round" StrokeStartLineCap="Round" />
+                        </Border>
+                        <TextBlock Text="{Binding AppTitle}" FontSize="21" FontWeight="Bold"
+                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding AppTagline}" Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" FontSize="11.5" Margin="1,12,0,0" LineHeight="17" />
+                </StackPanel>
+
+                <!-- Footer -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="24,0,20,18">
+                    <Border Height="1" Background="{DynamicResource BorderBrush}"
+                            Opacity="0.6" Margin="0,0,0,14" />
+                    <StackPanel Orientation="Horizontal">
+                        <ToggleButton x:Name="ThemeToggle" Style="{StaticResource ToggleSwitch}"
+                                      VerticalAlignment="Center" Click="ThemeToggle_Click"
+                                      ToolTip="Design zwischen Hell und Dunkel umschalten" />
+                        <TextBlock x:Name="ThemeLabel" Text="🌙 Dunkel"
+                                   FontFamily="{StaticResource AppFont}" FontSize="13"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="v0.1.0 · Open Source" Style="{StaticResource MutedText}"
+                               FontSize="11" Margin="1,14,0,0" />
+                </StackPanel>
+
+                <!-- Nav -->
+                <StackPanel Margin="0,10,0,0">
+                    <TextBlock Text="NAVIGATION" Style="{StaticResource MutedText}"
+                               FontSize="10.5" FontWeight="SemiBold" Margin="26,0,0,8"
+                               Opacity="0.7" />
+                    <RadioButton x:Name="NavDashboard" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Uebersicht}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M3 3 H10 V10 H3 Z M14 3 H21 V8 H14 Z M14 12 H21 V21 H14 Z M3 14 H10 V21 H3 Z" />
+                            <TextBlock Text="Übersicht" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavSystem" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=System}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M4 4 H20 V11 H4 Z M4 13 H20 V20 H4 Z M7 7.5 H7.01 M7 16.5 H7.01" />
+                            <TextBlock Text="Speicher &amp; RAM" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavCleaner" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Bereinigung}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z M11 9 L11 18 M14 9 L13 18" />
+                            <TextBlock Text="Bereinigung" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavStartup" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Autostart}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M12 3 L14 9 L20 9 L15 13 L17 20 L12 16 L7 20 L9 13 L4 9 L10 9 Z" />
+                            <TextBlock Text="Autostart" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ================= Content ================= -->
+        <Grid Grid.Column="1">
+            <views:DashboardView DataContext="{Binding Dashboard}"
+                                 Visibility="{Binding IsChecked, ElementName=NavDashboard, Converter={StaticResource BoolToVis}}" />
+            <views:SystemView DataContext="{Binding Dashboard}"
+                              Visibility="{Binding IsChecked, ElementName=NavSystem, Converter={StaticResource BoolToVis}}" />
+            <views:CleanerView DataContext="{Binding Cleaner}"
+                               Visibility="{Binding IsChecked, ElementName=NavCleaner, Converter={StaticResource BoolToVis}}" />
+            <views:StartupView DataContext="{Binding Startup}"
+                               Visibility="{Binding IsChecked, ElementName=NavStartup, Converter={StaticResource BoolToVis}}" />
+        </Grid>
+    </Grid>
+</Window>

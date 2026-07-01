@@ -1,0 +1,264 @@
+<UserControl x:Class="OpenClean.Views.CleanerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:OpenClean.Views"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900"
+             Background="{DynamicResource BgBrush}"
+             FontFamily="{DynamicResource AppFont}">
+    <UserControl.Resources>
+        <local:FileNameConverter x:Key="FileName" />
+    </UserControl.Resources>
+    <Grid Margin="32,28,32,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ===== Header ===== -->
+        <Grid Grid.Row="0">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Bereinigung" Style="{StaticResource HeaderText}" FontSize="24" />
+                <TextBlock Text="Vorschau vor dem Löschen – du entscheidest, was entfernt wird."
+                           Style="{StaticResource MutedText}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="Analysieren" Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ScanCommand}" />
+                <Button Content="Bereinigen" Style="{StaticResource PrimaryButton}"
+                        Command="{Binding CleanCommand}" Margin="12,0,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ===== Result + Summary banners ===== -->
+        <StackPanel Grid.Row="1">
+
+        <!-- Ergebnis-Banner nach dem Bereinigen -->
+        <Border Margin="0,22,0,0" Padding="20,14" CornerRadius="10"
+                Background="{DynamicResource AccentBrush}"
+                Visibility="{Binding HasReport, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                      Stroke="#FF10261F" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                <TextBlock Text="{Binding LastReportText}" Margin="14,0,0,0" VerticalAlignment="Center"
+                           Foreground="#FF10261F" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- Auswahl-Zusammenfassung -->
+        <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#FF262D31" Offset="0" />
+                    <GradientStop Color="#FF2D2D38" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="Zur Bereinigung ausgewählt" Style="{StaticResource MutedText}"
+                               FontSize="11.5" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SelectionSummary}" FontSize="19" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+                <Border Grid.Column="1" Background="{DynamicResource BgDeepBrush}" CornerRadius="8"
+                        Padding="18,12" VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="Objekte" Style="{StaticResource MutedText}" FontSize="11"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding SelectedCount}" FontSize="24" FontWeight="Bold"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        </StackPanel>
+
+        <!-- ===== Categories + preview ===== -->
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Auswahl-Werkzeuge über der Kategorie-Liste -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
+                        Margin="0,0,8,10">
+                <Button Content="Alles auswählen" Style="{StaticResource SecondaryButton}"
+                        Padding="12,6" FontSize="12.5"
+                        Command="{Binding SelectAllCommand}" />
+                <Button Content="Alles abwählen" Style="{StaticResource SecondaryButton}"
+                        Padding="12,6" FontSize="12.5" Margin="10,0,0,0"
+                        Command="{Binding DeselectAllCommand}" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                          Padding="0,0,8,0">
+            <ItemsControl ItemsSource="{Binding Categories}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Expander Margin="0,0,0,12" IsExpanded="False">
+                            <Expander.Header>
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- category enable checkbox -->
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                              VerticalAlignment="Center" Margin="0,0,14,0"
+                                              ToolTip="In die Analyse einbeziehen" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding HeaderDisplay}" FontSize="14.5" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}"
+                                                   FontSize="11.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <!-- master select-all -->
+                                    <CheckBox Grid.Column="2" IsChecked="{Binding AllSelected, Mode=TwoWay}"
+                                              IsThreeState="True" Content="Alle" VerticalAlignment="Center"
+                                              Margin="12,0,6,0" />
+                                </Grid>
+                            </Expander.Header>
+
+                            <!-- Preview rows -->
+                            <Grid Margin="14,0,14,12">
+                                <TextBlock Text="Keine Dateien gefunden – nach dem Analysieren erscheinen hier die Objekte."
+                                           Style="{StaticResource MutedText}" Margin="34,10,0,10"
+                                           Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                <Border Background="{DynamicResource BgDeepBrush}" CornerRadius="8"
+                                        Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}}">
+                                    <!-- Virtualisierte Liste: nur sichtbare Zeilen werden erzeugt,
+                                         damit das Aufklappen auch bei tausenden Einträgen sofort ist. -->
+                                    <ListBox ItemsSource="{Binding Items}" MaxHeight="320"
+                                             Background="Transparent" BorderThickness="0" Padding="6"
+                                             HorizontalContentAlignment="Stretch"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingStackPanel.IsVirtualizing="True"
+                                             VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <VirtualizingStackPanel />
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Margin" Value="0,1" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="row" Background="{TemplateBinding Background}"
+                                                                    CornerRadius="6" Padding="10,7">
+                                                                <ContentPresenter />
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="row" Property="Background"
+                                                                            Value="{DynamicResource SurfaceHoverBrush}" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              VerticalAlignment="Center" />
+                                                    <!-- Ordner-Icon -->
+                                                    <Path Grid.Column="1" Width="16" Height="16" Stretch="Uniform"
+                                                          Margin="12,0,12,0" VerticalAlignment="Center"
+                                                          Fill="{DynamicResource AccentBrush}"
+                                                          Data="M2 4 L8 4 L10 6 L20 6 L20 18 L2 18 Z"
+                                                          Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVis}}" />
+                                                    <!-- Datei-Icon -->
+                                                    <Path Grid.Column="1" Width="14" Height="16" Stretch="Uniform"
+                                                          Margin="12,0,12,0" VerticalAlignment="Center"
+                                                          Fill="{DynamicResource TextMutedBrush}"
+                                                          Data="M4 2 L13 2 L18 7 L18 20 L4 20 Z M13 2 L13 7 L18 7"
+                                                          Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                                                    <!-- Name (fett) + vollständiger Pfad (gedimmt) -->
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding FullPath, Converter={StaticResource FileName}}"
+                                                                   FontSize="13" FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   ToolTip="{Binding FullPath}" />
+                                                        <TextBlock Text="{Binding FullPath}"
+                                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                                   FontSize="11" Margin="0,1,0,0"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   ToolTip="{Binding FullPath}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="3" Text="{Binding SizeDisplay}"
+                                                               VerticalAlignment="Center" FontSize="12.5"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               Margin="16,0,4,0" MinWidth="72"
+                                                               TextAlignment="Right" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </Grid>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ===== Status + progress bar ===== -->
+        <Border Grid.Row="3" Background="{DynamicResource BgDeepBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
+                Margin="-32,14,-32,0" Padding="32,12">
+            <StackPanel>
+                <!-- Live-Fortschritt der Analyse: aktueller Pfad + Prozent + Restzeit -->
+                <Grid Margin="0,0,0,8"
+                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding ScanProgressText}"
+                               Style="{StaticResource MutedText}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ScanProgressPercent, StringFormat={}{0:0} %}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                        <TextBlock Text="{Binding ScanEtaText}" Style="{StaticResource MutedText}"
+                                   FontSize="12" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    </StackPanel>
+                </Grid>
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ScanProgressPercent, Mode=OneWay}"
+                             Height="6" Margin="0,0,0,8"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                           FontSize="12.5" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
