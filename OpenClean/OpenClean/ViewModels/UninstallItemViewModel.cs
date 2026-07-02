@@ -14,6 +14,7 @@ public sealed class UninstallItemViewModel : ViewModelBase
     private readonly Action _onSelectionChanged;
     private bool _isSelected;
     private bool _isBusy;
+    private long _sizeBytes;
 
     public UninstallItemViewModel(InstalledApp app, Func<UninstallItemViewModel, Task> onUninstall,
         Action onSelectionChanged)
@@ -21,6 +22,10 @@ public sealed class UninstallItemViewModel : ViewModelBase
         Model = app;
         _onUninstall = onUninstall;
         _onSelectionChanged = onSelectionChanged;
+        // Größe aus der Registry; fehlt sie, eine bereits berechnete (gecachte) Ordnergröße nutzen.
+        _sizeBytes = app.EstimatedBytes > 0
+            ? app.EstimatedBytes
+            : InstalledAppsService.GetCachedFolderSize(app.SizeFolder);
         UninstallCommand = new AsyncRelayCommand(_ => RunAsync(), _ => CanUninstall && !IsBusy);
     }
 
@@ -33,12 +38,30 @@ public sealed class UninstallItemViewModel : ViewModelBase
     public string PublisherDisplay =>
         string.IsNullOrWhiteSpace(Model.Publisher) ? Loc.T("uninstall.publisher.unknown") : Model.Publisher;
 
-    public string SizeDisplay =>
-        Model.EstimatedBytes > 0 ? ByteFormatter.Format(Model.EstimatedBytes) : "—";
+    public string SizeDisplay => _sizeBytes > 0 ? ByteFormatter.Format(_sizeBytes) : "—";
 
     public string InstallDateDisplay => Model.InstallDate?.ToString("dd.MM.yyyy") ?? "—";
 
-    public long SizeBytes => Model.EstimatedBytes;
+    public long SizeBytes => _sizeBytes;
+
+    /// <summary>
+    /// True, wenn noch keine Größe vorliegt (weder Registry noch Cache), aber ein
+    /// Größen-Ordner bekannt ist – dann lohnt die Hintergrund-Berechnung.
+    /// </summary>
+    public bool NeedsSizeCalculation =>
+        _sizeBytes <= 0 && !string.IsNullOrWhiteSpace(Model.SizeFolder);
+
+    /// <summary>Ordner für die nachträgliche Größenberechnung.</summary>
+    public string SizeFolder => Model.SizeFolder;
+
+    /// <summary>Setzt die nachträglich (aus dem Ordner) berechnete Größe und aktualisiert die Anzeige.</summary>
+    public void SetComputedSize(long bytes)
+    {
+        if (bytes <= 0 || bytes == _sizeBytes) return;
+        _sizeBytes = bytes;
+        OnPropertyChanged(nameof(SizeBytes));
+        OnPropertyChanged(nameof(SizeDisplay));
+    }
 
     public AsyncRelayCommand UninstallCommand { get; }
 

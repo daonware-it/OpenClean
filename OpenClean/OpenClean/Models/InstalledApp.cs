@@ -19,6 +19,14 @@ public sealed class InstalledApp
     /// <summary>Installationsordner (InstallLocation), ggf. leer.</summary>
     public string InstallLocation { get; init; } = "";
 
+    /// <summary>
+    /// Ordner, aus dem die Größe berechnet werden darf: InstallLocation oder – falls
+    /// diese fehlt/unsicher ist – abgeleitet aus DisplayIcon bzw. Uninstaller-Pfad.
+    /// NUR für die Größenberechnung; die Reste-Suche nutzt weiterhin InstallLocation,
+    /// damit ein geratener Ordner (z. B. Chrome bei Web-Apps) nie zur Löschung vorgeschlagen wird.
+    /// </summary>
+    public string SizeFolder { get; init; } = "";
+
     /// <summary>Geschätzte belegte Größe in Bytes (aus EstimatedSize, KB → Bytes). 0 = unbekannt.</summary>
     public long EstimatedBytes { get; init; }
 

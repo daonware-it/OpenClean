@@ -31,6 +31,7 @@ public sealed class UninstallViewModel : ViewModelBase
     private string _progressText = "";
 
     private string _leftoverAppName = "";
+    private int _loadGeneration;
 
     public ObservableCollection<UninstallItemViewModel> Apps { get; } = new();
     public ICollectionView AppsView { get; }
@@ -53,6 +54,16 @@ public sealed class UninstallViewModel : ViewModelBase
 
         AppsView = CollectionViewSource.GetDefaultView(Apps);
         AppsView.Filter = FilterApp;
+
+        // Live-Sortierung: nachträglich berechnete Größen positionieren die Zeile sanft neu,
+        // ohne die ganze Ansicht neu aufzubauen (verhindert „Aufblitzen"/Verschwinden).
+        if (AppsView is ICollectionViewLiveShaping live)
+        {
+            live.IsLiveSorting = true;
+            live.LiveSortingProperties.Add(nameof(UninstallItemViewModel.SizeBytes));
+            live.LiveSortingProperties.Add(nameof(UninstallItemViewModel.Name));
+        }
+
         ApplySort();
 
         _ = LoadAsync();
@@ -133,6 +144,7 @@ public sealed class UninstallViewModel : ViewModelBase
 
     public async Task LoadAsync()
     {
+        int generation = ++_loadGeneration; // laufende Größenberechnung eines früheren Laufs entwerten
         IsBusy = true;
         ProgressIsIndeterminate = true;
         StatusText = Loc.T("uninstall.status.loading");
@@ -149,6 +161,41 @@ public sealed class UninstallViewModel : ViewModelBase
         StatusText = Apps.Count == 0
             ? Loc.T("uninstall.status.none")
             : Loc.T("uninstall.status.summary", Apps.Count);
+
+        // Fehlende Größen (z. B. Steam-Spiele ohne EstimatedSize) im Hintergrund aus dem
+        // Installationsordner nachberechnen und live nachtragen.
+        _ = ComputeMissingSizesAsync(generation);
+    }
+
+    /// <summary>
+    /// Berechnet die Größe für Programme ohne Registry-Größe aus ihrem Installationsordner
+    /// und trägt sie live nach. Bricht ab, sobald ein neuer Ladevorgang gestartet wurde.
+    /// </summary>
+    private async Task ComputeMissingSizesAsync(int generation)
+    {
+        var pending = Apps.Where(a => a.NeedsSizeCalculation).ToList();
+        if (pending.Count == 0) return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        // Mehrere Ordner gleichzeitig vermessen (I/O-lastig) – sonst dauert es bei vielen
+        // Spielen sehr lange, bis alle Größen erscheinen. UI-Updates über den Dispatcher.
+        await Task.Run(() => Parallel.ForEach(pending,
+            new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            (item, state) =>
+            {
+                if (generation != _loadGeneration) { state.Stop(); return; } // neuer Load -> abbrechen
+                long size = InstalledAppsService.TryGetFolderSize(item.SizeFolder);
+                if (size <= 0 || generation != _loadGeneration) return;
+
+                dispatcher?.InvokeAsync(() =>
+                {
+                    if (generation != _loadGeneration) return;
+                    // Live-Sortierung ordnet die Zeile automatisch neu ein (kein harter Refresh).
+                    item.SetComputedSize(size);
+                    RefreshSelection();
+                });
+            }));
     }
 
     private bool FilterApp(object item)
@@ -166,9 +213,10 @@ public sealed class UninstallViewModel : ViewModelBase
         if (_sort == UninstallSort.Groesse)
             AppsView.SortDescriptions.Add(new SortDescription(nameof(UninstallItemViewModel.SizeBytes),
                 ListSortDirection.Descending));
-        else
-            AppsView.SortDescriptions.Add(new SortDescription(nameof(UninstallItemViewModel.Name),
-                ListSortDirection.Ascending));
+        // Name immer als sekundärer Schlüssel: stabile Reihenfolge bei gleicher Größe
+        // (sonst „springen" Einträge ohne Größe bei jedem Live-Sort-Update).
+        AppsView.SortDescriptions.Add(new SortDescription(nameof(UninstallItemViewModel.Name),
+            ListSortDirection.Ascending));
     }
 
     // ---- Deinstallation -----------------------------------------------------

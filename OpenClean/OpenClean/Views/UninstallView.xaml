@@ -82,11 +82,16 @@
 
         <!-- ===== Header ===== -->
         <Grid Grid.Row="0">
-            <StackPanel VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                 <TextBlock Text="{loc:Loc uninstall.title}" Style="{StaticResource HeaderText}" FontSize="24" />
-                <TextBlock Text="{loc:Loc uninstall.subtitle}" Style="{StaticResource MutedText}" Margin="0,4,0,0" />
+                <TextBlock Text="{loc:Loc uninstall.subtitle}" Style="{StaticResource MutedText}" Margin="0,4,0,0"
+                           TextTrimming="CharacterEllipsis" ToolTip="{loc:Loc uninstall.subtitle}" />
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Suche -->
                 <Grid Width="210" VerticalAlignment="Center" Margin="0,0,12,0">
                     <TextBox x:Name="SearchBox" Style="{StaticResource SearchBoxStyle}"
@@ -129,13 +134,17 @@
                 Visibility="{Binding HasLeftovers, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <Grid>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding LeftoverHeading}" FontSize="15" FontWeight="SemiBold" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="{Binding LeftoverHeading}" FontSize="15" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{loc:Loc uninstall.leftover.hint}" Style="{StaticResource MutedText}"
-                                   FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap" MaxWidth="620"
-                                   HorizontalAlignment="Left" />
+                                   FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Content="{loc:Loc uninstall.leftover.ignore}" Style="{StaticResource SecondaryButton}"
                                 Padding="14,8" Command="{Binding IgnoreLeftoversCommand}" />
                         <Button Content="{loc:Loc uninstall.leftover.action}" Style="{StaticResource PrimaryButton}"
@@ -283,9 +292,14 @@
                              Height="6" Margin="0,0,0,8"
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
                 <Grid>
-                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
-                               FontSize="12.5" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding SelectionSummary}" Style="{StaticResource MutedText}"
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                               FontSize="12.5" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding SelectionSummary}" Style="{StaticResource MutedText}"
                                FontSize="12.5" FontWeight="SemiBold" HorizontalAlignment="Right"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource AccentBrush}" />
