@@ -1,0 +1,59 @@
+# CodeQL – statische Sicherheitsanalyse (Code-Scanning) für OpenClean
+# Docs: https://docs.github.com/code-security/code-scanning
+#
+# Analysiert den C#-Code auf Schwachstellen (Injection, unsichere Krypto,
+# Path-Traversal, ...). Ergebnisse erscheinen im Tab "Security -> Code scanning".
+#
+# Hinweis: Für PRIVATE Repos ist dafür GitHub Advanced Security nötig. Ist sie
+# nicht aktiv, schlägt der letzte Schritt beim Hochladen der Ergebnisse fehl.
+# Bei ÖFFENTLICHEN Repos ist alles kostenlos verfügbar.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Wöchentlicher Voll-Scan (montags 06:00 UTC), fängt neue CodeQL-Regeln ab
+    - cron: "0 6 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (C#)
+    runs-on: windows-latest
+    permissions:
+      # Zum Hochladen der Analyseergebnisse (SARIF)
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # .NET 10 SDK für den manuellen Build (Ziel-Framework: net10.0-windows)
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # CodeQL initialisieren. C# ist kompiliert -> manueller Build unten,
+    # damit die Analyse zuverlässig den gesamten Code erfasst.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        build-mode: manual
+
+    # Projekt bauen, damit CodeQL den kompilierten Code analysieren kann
+    - name: Build
+      run: |
+        dotnet restore OpenClean/OpenClean.sln
+        dotnet build OpenClean/OpenClean.sln --configuration Release --no-restore
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:csharp"

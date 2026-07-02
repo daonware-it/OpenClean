@@ -1,0 +1,31 @@
+# Dependabot – automatisches Abhängigkeits-Scanning für OpenClean
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+#
+# Überwacht bekannte Sicherheitslücken und veraltete Versionen und öffnet
+# automatisch Update-Pull-Requests. Läuft ohne Advanced Security in jedem Repo.
+
+version: 2
+updates:
+  # NuGet-Pakete des WPF-Projekts (Microsoft.Data.Sqlite, SQLitePCLRaw, ...)
+  # Die .csproj liegt eine Ebene unter der Repo-Wurzel.
+  - package-ecosystem: "nuget"
+    directory: "/OpenClean/OpenClean"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+
+  # GitHub-Actions selbst aktuell halten (behebt u. a. die Node-20-Warnungen,
+  # sobald actions/checkout & setup-dotnet neue Versionen veröffentlichen)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
