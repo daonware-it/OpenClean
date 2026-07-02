@@ -193,6 +193,16 @@
                             <TextBlock Text="{loc:Loc nav.uninstall}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavDuplicates" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Duplikate}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M8 8 H20 V20 H8 Z M4 4 H16 V6 H6 V16 H4 Z" />
+                            <TextBlock Text="{loc:Loc nav.duplicates}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -215,6 +225,8 @@
                                 Visibility="{Binding IsChecked, ElementName=NavSchedule, Converter={StaticResource BoolToVis}}" />
             <views:UninstallView DataContext="{Binding Uninstall}"
                                  Visibility="{Binding IsChecked, ElementName=NavUninstall, Converter={StaticResource BoolToVis}}" />
+            <views:DuplicatesView DataContext="{Binding Duplicates}"
+                                  Visibility="{Binding IsChecked, ElementName=NavDuplicates, Converter={StaticResource BoolToVis}}" />
         </Grid>
     </Grid>
 </Window>

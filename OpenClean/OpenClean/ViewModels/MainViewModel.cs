@@ -14,7 +14,8 @@ public enum AppSection
     Privatsphaere,
     Updates,
     Zeitplan,
-    Deinstallation
+    Deinstallation,
+    Duplikate
 }
 
 /// <summary>
@@ -31,6 +32,7 @@ public sealed class MainViewModel : ViewModelBase
     public UpdaterViewModel Updater { get; } = new();
     public ScheduleViewModel Schedule { get; } = new();
     public UninstallViewModel Uninstall { get; } = new();
+    public DuplicatesViewModel Duplicates { get; } = new();
     public DashboardViewModel Dashboard { get; }
 
     public MainViewModel()
@@ -57,6 +59,7 @@ public sealed class MainViewModel : ViewModelBase
             Updater.Relocalize();
             Schedule.Relocalize();
             Uninstall.Relocalize();
+            Duplicates.Relocalize();
         };
     }
 
