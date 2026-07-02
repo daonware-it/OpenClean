@@ -16,8 +16,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class ExplorerSearchProvider : IPrivacyProvider
 {
-    public string Name => "Explorer-Suchverlauf";
-    public string Description => "Zuletzt im Datei-Explorer gesuchte Begriffe.";
+    public string Name => Loc.T("privacy.explorerSearch.name");
+    public string Description => Loc.T("privacy.explorerSearch.description");
 
     // Es werden persistente Spuren gelöscht -> Bestätigung anfordern.
     public bool RequiresConfirmation => true;

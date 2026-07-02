@@ -19,8 +19,8 @@ public sealed class BrowserHistoryProvider : IPrivacyProvider
     // Wie viele der neuesten Einträge je Profil gelistet werden (Vorschau-Grenze).
     private const int MaxEntriesPerProfile = 300;
 
-    public string Name => "Browser-Verlauf";
-    public string Description => "Zuletzt besuchte Webseiten in Chrome, Edge, Brave und Firefox.";
+    public string Name => Loc.T("privacy.browserHistory.name");
+    public string Description => Loc.T("privacy.browserHistory.description");
     public bool RequiresConfirmation => false;
 
     public bool IsAvailable =>

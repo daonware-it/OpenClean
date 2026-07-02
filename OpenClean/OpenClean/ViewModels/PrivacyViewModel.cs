@@ -20,7 +20,7 @@ public sealed class PrivacyViewModel : ViewModelBase
     private bool _hasScanned;
     private bool _suppressSelectionCallback;
     private bool _isBusy;
-    private string _statusText = "Bereit. Klicke auf »Analysieren«, um zu sehen, welche Spuren entfernt werden können.";
+    private string _statusText = Loc.T("privacy.status.ready");
 
     private string _lastReportText = "";
     private bool _hasReport;
@@ -90,8 +90,8 @@ public sealed class PrivacyViewModel : ViewModelBase
 
     public string SelectionSummary =>
         _hasScanned
-            ? $"{SelectedCount} Eintrag/Einträge ausgewählt"
-            : "Noch nicht analysiert.";
+            ? Loc.T("privacy.selection.summary", SelectedCount)
+            : Loc.T("common.notAnalyzed");
 
     private void SetAllSelection(bool selected)
     {
@@ -116,7 +116,7 @@ public sealed class PrivacyViewModel : ViewModelBase
     private async Task ScanAsync()
     {
         IsBusy = true;
-        StatusText = "Analysiere Privatsphäre-Spuren …";
+        StatusText = Loc.T("privacy.status.scanning");
         _hasScanned = false;
         HasReport = false;
 
@@ -154,8 +154,8 @@ public sealed class PrivacyViewModel : ViewModelBase
         IsBusy = false;
         RefreshSelectionState();
         StatusText = SelectedCount > 0
-            ? "Analyse abgeschlossen. Prüfe die Liste und klicke auf »Bereinigen«."
-            : "Analyse abgeschlossen – keine löschbaren Spuren gefunden.";
+            ? Loc.T("privacy.status.doneSelectable")
+            : Loc.T("privacy.status.doneEmpty");
     }
 
     private async Task CleanAsync()
@@ -172,7 +172,7 @@ public sealed class PrivacyViewModel : ViewModelBase
 
         IsBusy = true;
         HasReport = false;
-        StatusText = "Bereinige …";
+        StatusText = Loc.T("privacy.status.cleaning");
 
         // Auswahl je Gruppe festhalten (Snapshot), dann im Hintergrund löschen.
         var snapshot = affected
@@ -189,15 +189,15 @@ public sealed class PrivacyViewModel : ViewModelBase
             catch { deleted = 0; }
 
             totalDeleted += deleted;
-            reportLines.Add($"{group.Name}: {deleted} gelöscht");
+            reportLines.Add(Loc.T("privacy.report.line", group.Name, deleted));
         }
 
         // Nach dem Löschen frisch scannen, damit die Liste den echten Zustand zeigt.
         await ScanAsync();
 
-        LastReportText = $"{totalDeleted} Eintrag/Einträge gelöscht · " + string.Join(" · ", reportLines);
+        LastReportText = Loc.T("privacy.report.total", totalDeleted, string.Join(" · ", reportLines));
         HasReport = true;
-        StatusText = "Bereinigung abgeschlossen.";
+        StatusText = Loc.T("privacy.status.cleaned");
     }
 
     /// <summary>Baut den Warntext für den Bestätigungsdialog; bei Cookies o. Ä. besonders deutlich.</summary>
@@ -205,17 +205,14 @@ public sealed class PrivacyViewModel : ViewModelBase
     {
         var sb = new StringBuilder();
         int total = affected.Sum(g => g.SelectedCount);
-        sb.Append($"{total} Eintrag/Einträge aus folgenden Kategorien werden unwiderruflich gelöscht:\n");
+        sb.Append(Loc.T("privacy.confirm.intro", total));
         foreach (var group in affected)
-            sb.Append($"\n• {group.Name}: {group.SelectedCount}");
+            sb.Append(Loc.T("privacy.confirm.categoryLine", group.Name, group.SelectedCount));
 
         if (strongWarning)
-        {
-            sb.Append("\n\n⚠ ACHTUNG: Enthaltene Cookies werden entfernt. Dadurch wirst du auf den " +
-                      "betroffenen Websites abgemeldet und musst dich neu anmelden.");
-        }
+            sb.Append(Loc.T("privacy.confirm.cookieWarning"));
 
-        sb.Append("\n\nMöchtest du fortfahren?");
+        sb.Append(Loc.T("privacy.confirm.proceed"));
         return sb.ToString();
     }
 
@@ -228,5 +225,15 @@ public sealed class PrivacyViewModel : ViewModelBase
         CleanCommand.RaiseCanExecuteChanged();
         SelectAllCommand.RaiseCanExecuteChanged();
         DeselectAllCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Aktualisiert nach einem Sprachwechsel alle berechneten Texte.</summary>
+    public void Relocalize()
+    {
+        OnPropertyChanged(nameof(SelectionSummary));
+        foreach (var group in Groups)
+            group.RefreshLabels();
+        if (!IsBusy && !_hasScanned)
+            StatusText = Loc.T("privacy.status.ready");
     }
 }

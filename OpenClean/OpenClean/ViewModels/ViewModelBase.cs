@@ -75,7 +75,7 @@ public sealed class AsyncRelayCommand : ICommand
         {
             // async void: eine unbehandelte Ausnahme würde die App beenden.
             System.Windows.MessageBox.Show(
-                $"Unerwarteter Fehler: {ex.Message}", "OpenClean",
+                OpenClean.Services.Localization.Loc.T("error.unexpected", ex.Message), "OpenClean",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
         finally

@@ -23,10 +23,9 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class MediaPlayerProvider : IPrivacyProvider
 {
-    public string Name => "Media-Player-Verlauf";
+    public string Name => Loc.T("privacy.mediaPlayer.name");
 
-    public string Description =>
-        "Zuletzt abgespielte Medien in VLC media player und Windows Media Player.";
+    public string Description => Loc.T("privacy.mediaPlayer.description");
 
     public bool RequiresConfirmation => true;
 

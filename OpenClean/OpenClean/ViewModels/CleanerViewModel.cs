@@ -18,7 +18,7 @@ public sealed class CleanerViewModel : ViewModelBase
 
     private bool _hasScanned;
     private bool _suppressSelectionCallback;
-    private string _statusText = "Bereit. Klicke auf »Analysieren«, um zu sehen, was bereinigt werden kann.";
+    private string _statusText = Loc.T("cleaner.status.ready");
     private bool _isBusy;
 
     private double _scanProgressPercent;
@@ -139,17 +139,17 @@ public sealed class CleanerViewModel : ViewModelBase
 
     public string SelectionSummary =>
         _hasScanned
-            ? $"{SelectedCount} Objekt(e) ausgewählt · {ByteFormatter.Format(TotalSelectedBytes)} werden freigegeben"
-            : "Noch nicht analysiert.";
+            ? Loc.T("cleaner.selection.summary", SelectedCount, ByteFormatter.Format(TotalSelectedBytes))
+            : Loc.T("common.notAnalyzed");
 
     private async Task ScanAsync()
     {
         IsBusy = true;
-        StatusText = "Analysiere Temp- und Cache-Verzeichnisse …";
+        StatusText = Loc.T("cleaner.status.scanning");
         _hasScanned = false;
         HasReport = false;
         ScanProgressPercent = 0;
-        ScanProgressText = "Analyse wird vorbereitet …";
+        ScanProgressText = Loc.T("cleaner.status.preparing");
         ScanEtaText = "";
 
         var enabled = Categories.Where(c => c.IsEnabled).ToList();
@@ -160,8 +160,8 @@ public sealed class CleanerViewModel : ViewModelBase
         {
             ScanProgressPercent = p.Percent;
             ScanProgressText = string.IsNullOrEmpty(p.CurrentPath)
-                ? "Analysiere …"
-                : $"Analysiere: {p.CurrentPath}";
+                ? Loc.T("cleaner.progress.analyzing")
+                : Loc.T("cleaner.progress.analyzingPath", p.CurrentPath);
             ScanEtaText = FormatEta(stopwatch.Elapsed, p.Done, p.Total);
         });
 
@@ -197,8 +197,8 @@ public sealed class CleanerViewModel : ViewModelBase
         ScanEtaText = "";
         RefreshSelectionState();
         StatusText = TotalSelectedBytes > 0
-            ? "Analyse abgeschlossen. Prüfe die Liste und klicke auf »Bereinigen«."
-            : "Analyse abgeschlossen – nichts zu bereinigen gefunden.";
+            ? Loc.T("cleaner.status.doneSelectable")
+            : Loc.T("cleaner.status.doneEmpty");
     }
 
     /// <summary>Schätzt aus verstrichener Zeit und Fortschritt die verbleibende Restzeit.</summary>
@@ -213,7 +213,7 @@ public sealed class CleanerViewModel : ViewModelBase
         string text = remaining.TotalHours >= 1
             ? remaining.ToString(@"h\:mm\:ss")
             : remaining.ToString(@"mm\:ss");
-        return $"ca. {text} verbleibend";
+        return Loc.T("cleaner.eta.remaining", text);
     }
 
     private async Task CleanAsync()
@@ -223,23 +223,24 @@ public sealed class CleanerViewModel : ViewModelBase
 
         bool confirmed = ConfirmDialog.Show(
             Application.Current?.MainWindow,
-            $"{expectedCount} Objekt(e) mit insgesamt {ByteFormatter.Format(expectedBytes)} werden unwiderruflich gelöscht.\n\n" +
-            "Möchtest du fortfahren?");
+            Loc.T("cleaner.confirm.message", expectedCount, ByteFormatter.Format(expectedBytes)));
 
         if (!confirmed) return;
 
         IsBusy = true;
         HasReport = false;
-        StatusText = "Bereinige …";
+        StatusText = Loc.T("cleaner.progress.deleting");
         ScanProgressPercent = 0;
-        ScanProgressText = "Bereinigung wird vorbereitet …";
+        ScanProgressText = Loc.T("cleaner.confirm.preparing");
         ScanEtaText = "";
 
         // IProgress auf dem UI-Thread → Callbacks marshallen automatisch zurück.
         var progress = new Progress<CleanupProgress>(p =>
         {
             ScanProgressPercent = p.Percent;
-            ScanProgressText = string.IsNullOrEmpty(p.CurrentPath) ? "Lösche …" : $"Lösche: {p.CurrentPath}";
+            ScanProgressText = string.IsNullOrEmpty(p.CurrentPath)
+                ? Loc.T("cleaner.progress.deleting")
+                : Loc.T("cleaner.progress.deletingPath", p.CurrentPath);
             ScanEtaText = "";
         });
 
@@ -250,8 +251,8 @@ public sealed class CleanerViewModel : ViewModelBase
         await ScanAsync();
 
         StatusText = report.Summary;
-        LastReportText = $"{report.DeletedCount} Objekt(e) gelöscht · {ByteFormatter.Format(report.FreedBytes)} freigegeben"
-            + (report.Skipped.Count > 0 ? $" · {report.Skipped.Count} übersprungen" : "");
+        LastReportText = Loc.T("cleaner.report", report.DeletedCount, ByteFormatter.Format(report.FreedBytes))
+            + (report.Skipped.Count > 0 ? Loc.T("cleaner.report.skipped", report.Skipped.Count) : "");
         HasReport = true;
     }
 
@@ -272,5 +273,16 @@ public sealed class CleanerViewModel : ViewModelBase
         CleanCommand.RaiseCanExecuteChanged();
         SelectAllCommand.RaiseCanExecuteChanged();
         DeselectAllCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Aktualisiert nach einem Sprachwechsel alle berechneten Texte.</summary>
+    public void Relocalize()
+    {
+        OnPropertyChanged(nameof(SelectionSummary));
+        // Kategorie-Name/Beschreibung/Kopfzeile neu auswerten.
+        foreach (var category in Categories)
+            category.RefreshLabels();
+        if (!IsBusy && !_hasScanned)
+            StatusText = Loc.T("cleaner.status.ready");
     }
 }

@@ -19,8 +19,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class ClipboardProvider : IPrivacyProvider
 {
-    public string Name => "Zwischenablage";
-    public string Description => "Der aktuelle Inhalt der Windows-Zwischenablage.";
+    public string Name => Loc.T("privacy.clipboard.name");
+    public string Description => Loc.T("privacy.clipboard.description");
 
     // Sofortiges Leeren ohne Vorschau erforderlich.
     public bool RequiresConfirmation => false;
@@ -39,7 +39,7 @@ public sealed class ClipboardProvider : IPrivacyProvider
             {
                 items.Add(new PrivacyItem
                 {
-                    Name = "Zwischenablage-Inhalt",
+                    Name = Loc.T("privacy.clipboard.itemName"),
                     Detail = contentType
                 });
             }

@@ -16,9 +16,10 @@ public sealed class TempScannerService
     /// </summary>
     private sealed record Root(string Path, string? Pattern, bool SelfAsItem = false);
 
+    // Key = Basis-Lokalisierungsschlüssel der Kategorie (z. B. "cat.windowsTemp");
+    // der Anzeigename kommt aus "<Key>.name", die Beschreibung aus "<Key>.description".
     private sealed record CategoryDef(
-        string Name,
-        string Description,
+        string Key,
         CleanupKind Kind,
         Func<IEnumerable<Root>> RootProvider,
         Func<bool>? IsAvailable = null);
@@ -32,8 +33,7 @@ public sealed class TempScannerService
         => Definitions.Where(d => d.IsAvailable?.Invoke() ?? true)
                       .Select(d => new CleanupCategory
                       {
-                          Name = d.Name,
-                          Description = d.Description,
+                          Key = d.Key,
                           Kind = d.Kind
                       }).ToList();
 
@@ -112,18 +112,18 @@ public sealed class TempScannerService
         HashSet<string> seen)
     {
         var results = new List<ScanItem>();
-        var def = Definitions.FirstOrDefault(d => d.Name == category.Name);
+        var def = Definitions.FirstOrDefault(d => d.Key == category.Key);
         if (def is null) return results;
 
         if (def.Kind == CleanupKind.RecycleBin)
         {
-            progress?.Report(new ScanProgress { CurrentPath = "Papierkorb …", Done = done, Total = total });
+            progress?.Report(new ScanProgress { CurrentPath = Loc.T("cleanup.recycleBin.progress"), Done = done, Total = total });
             long size = RecycleBin.GetSize();
             if (size > 0)
             {
                 results.Add(new ScanItem
                 {
-                    FullPath = "Papierkorb (alle Laufwerke)",
+                    FullPath = Loc.T("cleanup.recycleBin.itemPath"),
                     SizeBytes = size,
                     IsDirectory = true
                 });
@@ -202,7 +202,7 @@ public sealed class TempScannerService
     /// </summary>
     private static int CountTopLevel(CleanupCategory category)
     {
-        var def = Definitions.FirstOrDefault(d => d.Name == category.Name);
+        var def = Definitions.FirstOrDefault(d => d.Key == category.Key);
         if (def is null) return 0;
         if (def.Kind == CleanupKind.RecycleBin) return 1;
 
@@ -261,8 +261,7 @@ public sealed class TempScannerService
     private static IReadOnlyList<CategoryDef> BuildDefinitions() => new List<CategoryDef>
     {
         new(
-            "Windows-Temp",
-            "Temporäre Dateien von Windows und Programmen (%TEMP%, C:\\Windows\\Temp).",
+            "cat.windowsTemp",
             CleanupKind.FileDeletion,
             () => Distinct(new[]
             {
@@ -272,14 +271,12 @@ public sealed class TempScannerService
             }).Select(p => new Root(p, null))),
 
         new(
-            "Windows-Update-Cache",
-            "Bereits installierte Update-Downloads (SoftwareDistribution\\Download). Benötigt Admin.",
+            "cat.updateCache",
             CleanupKind.FileDeletion,
             () => new[] { new Root(Path.Combine(WinDir, "SoftwareDistribution", "Download"), null) }),
 
         new(
-            "Thumbnail-Cache",
-            "Miniaturansicht-Datenbanken des Explorers (thumbcache_*.db). Werden neu aufgebaut.",
+            "cat.thumbnails",
             CleanupKind.FileDeletion,
             () => new[]
             {
@@ -288,49 +285,42 @@ public sealed class TempScannerService
             }),
 
         new(
-            "Google Chrome",
-            "Zwischengespeicherte Webinhalte von Google Chrome (alle Profile).",
+            "cat.chrome",
             CleanupKind.FileDeletion,
             () => ChromiumRoots(ChromeUserData),
             () => Directory.Exists(ChromeUserData)),
 
         new(
-            "Microsoft Edge",
-            "Zwischengespeicherte Webinhalte von Microsoft Edge (alle Profile).",
+            "cat.edge",
             CleanupKind.FileDeletion,
             () => ChromiumRoots(EdgeUserData),
             () => Directory.Exists(EdgeUserData)),
 
         new(
-            "Brave",
-            "Zwischengespeicherte Webinhalte von Brave (alle Profile).",
+            "cat.brave",
             CleanupKind.FileDeletion,
             () => ChromiumRoots(BraveUserData),
             () => Directory.Exists(BraveUserData)),
 
         new(
-            "Mozilla Firefox",
-            "Zwischengespeicherte Webinhalte von Mozilla Firefox (alle Profile).",
+            "cat.firefox",
             CleanupKind.FileDeletion,
             FirefoxCacheRoots,
             IsFirefoxInstalled),
 
         new(
-            "Internet-Cache (Legacy/WinINet)",
-            "Zwischengespeicherter WinINet-/IE-Cache (%LocalAppData%\\Microsoft\\Windows\\INetCache).",
+            "cat.inetCache",
             CleanupKind.FileDeletion,
             InetCacheRoots,
             () => Directory.Exists(InetCachePath)),
 
         new(
-            "App-Caches (AppData)",
-            "Bekannte Cache-Ordner installierter Apps unter %AppData% und %LocalAppData%.",
+            "cat.appCache",
             CleanupKind.FileDeletion,
             AppDataCacheRoots),
 
         new(
-            "Papierkorb",
-            "Leert den Papierkorb aller Laufwerke über die Windows-Shell.",
+            "cat.recycleBin",
             CleanupKind.RecycleBin,
             Array.Empty<Root>)
     };

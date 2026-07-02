@@ -30,7 +30,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private bool _ramValid;
 
     // ---- Score ----
-    private ScoreResult _score = new() { Score = 100, Level = ScoreLevel.Good, Label = "Gut" };
+    private ScoreResult _score = new() { Score = 100, Level = ScoreLevel.Good, Label = Loc.T("score.good") };
 
     // ---- Startup ----
     private int _startupTotal;
@@ -43,7 +43,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private bool _tempAnalyzed;
 
     private bool _isBusy;
-    private string _statusText = "Analyse wird vorbereitet …";
+    private string _statusText = Loc.T("dashboard.status.preparing");
 
     public ObservableCollection<DriveUsage> Drives { get; } = new();
     public ObservableCollection<ScoreFactor> ScoreFactors { get; } = new();
@@ -88,8 +88,8 @@ public sealed class DashboardViewModel : ViewModelBase
     public bool RamValid { get => _ramValid; private set => SetProperty(ref _ramValid, value); }
 
     public string RamSummary => _ramValid
-        ? $"{UsedRam} von {TotalRam} belegt · {AvailableRam} frei"
-        : "RAM-Auslastung nicht verfügbar.";
+        ? Loc.T("dashboard.ram.summary", UsedRam, TotalRam, AvailableRam)
+        : Loc.T("dashboard.ram.unavailable");
 
     private void RefreshRam()
     {
@@ -121,16 +121,21 @@ public sealed class DashboardViewModel : ViewModelBase
         foreach (var drive in _systemInfo.GetFixedDrives())
             Drives.Add(drive);
         OnPropertyChanged(nameof(DrivesSummary));
+        OnPropertyChanged(nameof(DriveCountDisplay));
     }
+
+    /// <summary>Anzahl Laufwerke als lokalisierter Text (Kachel "SPEICHERPLATZ").</summary>
+    public string DriveCountDisplay => Loc.T("dashboard.driveCount", Drives.Count);
 
     public string DrivesSummary
     {
         get
         {
-            if (Drives.Count == 0) return "Keine festen Laufwerke gefunden.";
+            if (Drives.Count == 0) return Loc.T("dashboard.drives.none");
             long total = Drives.Sum(d => d.TotalBytes);
             long free = Drives.Sum(d => d.FreeBytes);
-            return $"{Drives.Count} Laufwerk(e) · {ByteFormatter.Format(free)} von {ByteFormatter.Format(total)} frei";
+            return Loc.T("dashboard.drives.summary",
+                Drives.Count, ByteFormatter.Format(free), ByteFormatter.Format(total));
         }
     }
 
@@ -146,14 +151,14 @@ public sealed class DashboardViewModel : ViewModelBase
     public int StartupHighImpact { get => _startupHighImpact; private set { if (SetProperty(ref _startupHighImpact, value)) OnPropertyChanged(nameof(StartupSummary)); } }
 
     public string StartupSummary =>
-        $"{StartupEnabled} aktiv · {StartupHighImpact} mit hoher Startlast";
+        Loc.T("dashboard.startup.summary", StartupEnabled, StartupHighImpact);
 
     // ---- Temp ----
     public string TempReclaimable => _tempAnalyzed ? ByteFormatter.Format(_tempBytes) : "–";
     public int TempItems { get => _tempItems; private set => SetProperty(ref _tempItems, value); }
     public string TempSummary => _tempAnalyzed
-        ? $"{ByteFormatter.Format(_tempBytes)} in {_tempItems} Objekt(en) bereinigbar"
-        : "Noch nicht analysiert.";
+        ? Loc.T("dashboard.temp.summary", ByteFormatter.Format(_tempBytes), _tempItems)
+        : Loc.T("common.notAnalyzed");
 
     public bool IsBusy
     {
@@ -180,7 +185,7 @@ public sealed class DashboardViewModel : ViewModelBase
     public async Task AnalyzeAsync()
     {
         IsBusy = true;
-        StatusText = "Analysiere System (Temp-/Cache-Größe, Autostart, Laufwerke) …";
+        StatusText = Loc.T("dashboard.status.analyzing");
 
         RefreshRam();
         RefreshDrives();
@@ -231,7 +236,7 @@ public sealed class DashboardViewModel : ViewModelBase
         BuildRecommendations();
 
         IsBusy = false;
-        StatusText = $"Analyse abgeschlossen · Score {Score}/100 ({ScoreLabel}).";
+        StatusText = Loc.T("dashboard.status.done", Score, ScoreLabel);
     }
 
     // ---- Score-Berechnung (nur echte Messwerte) ----------------------------
@@ -253,49 +258,49 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             double freePct = drive.FreePercent;
             if (freePct < 10)
-                Penalty(25, $"Laufwerk {drive.Letter} nur {freePct:0} % frei (kritisch)");
+                Penalty(25, Loc.T("score.factor.driveCritical", drive.Letter, freePct.ToString("0")));
             else if (freePct < 20)
-                Penalty(10, $"Laufwerk {drive.Letter} nur {freePct:0} % frei (knapp)");
+                Penalty(10, Loc.T("score.factor.driveLow", drive.Letter, freePct.ToString("0")));
         }
 
         // 2) Bereinigbare Temp-/Cache-Größe (echtes ScanAll-Ergebnis).
         double tempGb = _tempBytes / (1024.0 * 1024 * 1024);
         double tempMb = _tempBytes / (1024.0 * 1024);
         if (tempGb > 5)
-            Penalty(20, $"{ByteFormatter.Format(_tempBytes)} bereinigbar (Temp/Cache)");
+            Penalty(20, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
         else if (tempGb > 1)
-            Penalty(10, $"{ByteFormatter.Format(_tempBytes)} bereinigbar (Temp/Cache)");
+            Penalty(10, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
         else if (tempMb > 200)
-            Penalty(5, $"{ByteFormatter.Format(_tempBytes)} bereinigbar (Temp/Cache)");
+            Penalty(5, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
 
         // 3) Autostart (echte StartupService-Daten).
         if (_startupEnabled > 20)
-            Penalty(15, $"{_startupEnabled} Autostart-Programme aktiv");
+            Penalty(15, Loc.T("score.factor.startupActive", _startupEnabled));
         else if (_startupEnabled > 10)
-            Penalty(8, $"{_startupEnabled} Autostart-Programme aktiv");
+            Penalty(8, Loc.T("score.factor.startupActive", _startupEnabled));
 
         if (_startupHighImpact > 0)
         {
             int highPenalty = Math.Min(_startupHighImpact * 3, 12);
-            Penalty(highPenalty, $"{_startupHighImpact} Autostart mit hoher Startlast");
+            Penalty(highPenalty, Loc.T("score.factor.startupHigh", _startupHighImpact));
         }
 
         // 4) RAM-Auslastung (echtes dwMemoryLoad).
         if (_ramValid)
         {
             if (_ramPercent > 90)
-                Penalty(15, $"RAM-Auslastung {_ramPercent:0} %");
+                Penalty(15, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
             else if (_ramPercent > 80)
-                Penalty(8, $"RAM-Auslastung {_ramPercent:0} %");
+                Penalty(8, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
         }
 
         score = Math.Clamp(score, 0, 100);
 
         var (level, label) = score >= 80
-            ? (ScoreLevel.Good, "Gut")
+            ? (ScoreLevel.Good, Loc.T("score.good"))
             : score >= 50
-                ? (ScoreLevel.Improvable, "Verbesserbar")
-                : (ScoreLevel.Critical, "Kritisch");
+                ? (ScoreLevel.Improvable, Loc.T("score.improvable"))
+                : (ScoreLevel.Critical, Loc.T("score.critical"));
 
         _score = new ScoreResult
         {
@@ -319,8 +324,8 @@ public sealed class DashboardViewModel : ViewModelBase
     public bool HasScoreFactors => ScoreFactors.Count > 0;
 
     public string ScoreExplanation => HasScoreFactors
-        ? "Diese Faktoren haben Punkte gekostet:"
-        : "Keine messbaren Probleme gefunden – alles im grünen Bereich.";
+        ? Loc.T("score.explanation.factors")
+        : Loc.T("score.explanation.clean");
 
     // ---- Empfehlungen ------------------------------------------------------
 
@@ -333,10 +338,10 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             Recommendations.Add(new Recommendation
             {
-                Title = $"{ByteFormatter.Format(_tempBytes)} bereinigbar",
-                Text = $"{_tempItems} temporäre Dateien/Caches können freigegeben werden.",
+                Title = Loc.T("reco.reclaimable.title", ByteFormatter.Format(_tempBytes)),
+                Text = Loc.T("reco.reclaimable.text", _tempItems),
                 Severity = tempMb > 1024 ? RecommendationSeverity.Warning : RecommendationSeverity.Info,
-                ActionLabel = "Bereinigen",
+                ActionLabel = Loc.T("common.clean"),
                 ActionCommand = new RelayCommand(_ =>
                 {
                     _navigate(AppSection.Bereinigung);
@@ -351,10 +356,10 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             Recommendations.Add(new Recommendation
             {
-                Title = $"Laufwerk {drive.Letter} ist zu {drive.UsedPercent:0} % belegt",
-                Text = $"Nur noch {drive.FreeDisplay} frei. Bereinigen schafft Platz.",
+                Title = Loc.T("reco.driveFull.title", drive.Letter, drive.UsedPercent.ToString("0")),
+                Text = Loc.T("reco.driveFull.text", drive.FreeDisplay),
                 Severity = drive.FreePercent < 10 ? RecommendationSeverity.Critical : RecommendationSeverity.Warning,
-                ActionLabel = "Bereinigen",
+                ActionLabel = Loc.T("common.clean"),
                 ActionCommand = new RelayCommand(_ => _navigate(AppSection.Bereinigung))
             });
         }
@@ -363,12 +368,12 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             Recommendations.Add(new Recommendation
             {
-                Title = $"{_startupEnabled} Autostart-Programme prüfen",
+                Title = Loc.T("reco.startup.title", _startupEnabled),
                 Text = _startupHighImpact > 0
-                    ? $"{_startupHighImpact} davon mit hoher Startlast – Abschalten kann den Systemstart beschleunigen."
-                    : "Viele Programme starten mit Windows – prüfe, was du wirklich brauchst.",
+                    ? Loc.T("reco.startup.textHigh", _startupHighImpact)
+                    : Loc.T("reco.startup.textMany"),
                 Severity = _startupHighImpact > 0 ? RecommendationSeverity.Warning : RecommendationSeverity.Info,
-                ActionLabel = "Autostart öffnen",
+                ActionLabel = Loc.T("dashboard.openStartup"),
                 ActionCommand = new RelayCommand(_ => _navigate(AppSection.Autostart))
             });
         }
@@ -378,10 +383,10 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             Recommendations.Add(new Recommendation
             {
-                Title = $"Hohe RAM-Auslastung ({_ramPercent:0} %)",
-                Text = "Nur Information: Schließe nicht benötigte Programme. OpenClean gibt keinen Arbeitsspeicher „frei“.",
+                Title = Loc.T("reco.ram.title", _ramPercent.ToString("0")),
+                Text = Loc.T("reco.ram.text"),
                 Severity = RecommendationSeverity.Info,
-                ActionLabel = "Aktualisieren",
+                ActionLabel = Loc.T("common.refresh"),
                 ActionCommand = RefreshRamCommand
             });
         }
@@ -390,8 +395,8 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             Recommendations.Add(new Recommendation
             {
-                Title = "Alles im grünen Bereich",
-                Text = "Keine messbaren Probleme gefunden. Dein System ist sauber und gut ausgelastet.",
+                Title = Loc.T("reco.allGood.title"),
+                Text = Loc.T("reco.allGood.text"),
                 Severity = RecommendationSeverity.Positive
             });
         }
@@ -400,4 +405,28 @@ public sealed class DashboardViewModel : ViewModelBase
     }
 
     public bool HasRecommendations => Recommendations.Count > 0;
+
+    /// <summary>Baut nach einem Sprachwechsel alle berechneten Texte neu auf.</summary>
+    public void Relocalize()
+    {
+        // Reine Anzeige-Properties neu auswerten lassen.
+        OnPropertyChanged(nameof(RamSummary));
+        OnPropertyChanged(nameof(DrivesSummary));
+        OnPropertyChanged(nameof(DriveCountDisplay));
+        OnPropertyChanged(nameof(StartupSummary));
+        OnPropertyChanged(nameof(TempReclaimable));
+        OnPropertyChanged(nameof(TempSummary));
+
+        if (_analyzed && !IsBusy)
+        {
+            // Score-Faktoren und Empfehlungen enthalten übersetzten Text -> neu berechnen.
+            ComputeScore();
+            BuildRecommendations();
+            StatusText = Loc.T("dashboard.status.done", Score, ScoreLabel);
+        }
+        else if (!_analyzed)
+        {
+            StatusText = Loc.T("dashboard.status.preparing");
+        }
+    }
 }

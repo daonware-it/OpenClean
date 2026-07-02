@@ -436,11 +436,11 @@ public sealed class StartupService
         if (entry.Location == StartupLocation.PackagedApp)
         {
             if (string.IsNullOrEmpty(entry.PackagedStateKeyPath))
-                throw new InvalidOperationException("Kein Task-Schlüssel für diese Store-App bekannt.");
+                throw new InvalidOperationException(Loc.T("startup.error.noTaskKey"));
 
             using var pkgBaseKey = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
             using var taskKey = pkgBaseKey.OpenSubKey(entry.PackagedStateKeyPath, writable: true)
-                ?? throw new InvalidOperationException("Task-Schlüssel der Store-App nicht gefunden.");
+                ?? throw new InvalidOperationException(Loc.T("startup.error.taskKeyMissing"));
             taskKey.SetValue("State", enabled ? 2 : 1, RegistryValueKind.DWord);
             entry.IsEnabled = enabled;
             return;

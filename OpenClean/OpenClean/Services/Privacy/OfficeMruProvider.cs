@@ -17,8 +17,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class OfficeMruProvider : IPrivacyProvider
 {
-    public string Name => "Office-Verlauf";
-    public string Description => "Zuletzt in Word, Excel und PowerPoint geöffnete Dokumente (MRU).";
+    public string Name => Loc.T("privacy.officeMru.name");
+    public string Description => Loc.T("privacy.officeMru.description");
 
     // Es werden persistente Spuren gelöscht -> Bestätigung anfordern.
     public bool RequiresConfirmation => true;

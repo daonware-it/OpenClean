@@ -65,7 +65,7 @@ public sealed class StartupEntry
     public string Publisher { get; init; } = "";
 
     /// <summary>Anzeigename des Herausgebers; „Unbekannt", wenn leer.</summary>
-    public string PublisherDisplay => string.IsNullOrWhiteSpace(Publisher) ? "Unbekannt" : Publisher;
+    public string PublisherDisplay => string.IsNullOrWhiteSpace(Publisher) ? Loc.T("startup.publisher.unknown") : Publisher;
 
     public StartupImpact Impact { get; set; } = StartupImpact.Unknown;
 
@@ -74,16 +74,16 @@ public sealed class StartupEntry
 
     public string LocationDisplay => Location switch
     {
-        StartupLocation.HkcuRun => "Registry (Aktueller Benutzer)",
-        StartupLocation.HklmRun => "Registry (Alle Benutzer)",
-        StartupLocation.HklmRunWow6432 => "Registry (Alle Benutzer, 32-Bit)",
-        StartupLocation.HkcuRunOnce => "Registry (Aktueller Benutzer, RunOnce)",
-        StartupLocation.HklmRunOnce => "Registry (Alle Benutzer, RunOnce)",
-        StartupLocation.HklmPoliciesRun => "Registry (Richtlinie, Alle Benutzer)",
-        StartupLocation.HkcuPoliciesRun => "Registry (Richtlinie, Aktueller Benutzer)",
-        StartupLocation.PackagedApp => "Store-App (UWP)",
-        StartupLocation.StartupFolderUser => "Autostart-Ordner (Benutzer)",
-        StartupLocation.StartupFolderCommon => "Autostart-Ordner (Alle Benutzer)",
+        StartupLocation.HkcuRun => Loc.T("startup.location.hkcuRun"),
+        StartupLocation.HklmRun => Loc.T("startup.location.hklmRun"),
+        StartupLocation.HklmRunWow6432 => Loc.T("startup.location.hklmRunWow"),
+        StartupLocation.HkcuRunOnce => Loc.T("startup.location.hkcuRunOnce"),
+        StartupLocation.HklmRunOnce => Loc.T("startup.location.hklmRunOnce"),
+        StartupLocation.HklmPoliciesRun => Loc.T("startup.location.hklmPolicies"),
+        StartupLocation.HkcuPoliciesRun => Loc.T("startup.location.hkcuPolicies"),
+        StartupLocation.PackagedApp => Loc.T("startup.location.packaged"),
+        StartupLocation.StartupFolderUser => Loc.T("startup.location.folderUser"),
+        StartupLocation.StartupFolderCommon => Loc.T("startup.location.folderCommon"),
         _ => Location.ToString()
     };
 
@@ -93,14 +93,16 @@ public sealed class StartupEntry
         {
             string label = Impact switch
             {
-                StartupImpact.High => "Hoch",
-                StartupImpact.Medium => "Mittel",
-                StartupImpact.Low => "Niedrig",
-                _ => "Unbekannt"
+                StartupImpact.High => Loc.T("startup.impact.high"),
+                StartupImpact.Medium => Loc.T("startup.impact.medium"),
+                StartupImpact.Low => Loc.T("startup.impact.low"),
+                _ => Loc.T("startup.impact.unknown")
             };
-            return ImpactIsEstimated && Impact != StartupImpact.Unknown ? $"~{label} (geschätzt)" : label;
+            return ImpactIsEstimated && Impact != StartupImpact.Unknown
+                ? Loc.T("startup.impact.estimated", label)
+                : label;
         }
     }
 
-    public string StatusDisplay => IsEnabled ? "Aktiviert" : "Deaktiviert";
+    public string StatusDisplay => IsEnabled ? Loc.T("startup.state.enabled") : Loc.T("startup.state.disabled");
 }

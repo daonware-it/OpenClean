@@ -17,8 +17,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class CookiesProvider : IPrivacyProvider
 {
-    public string Name => "Cookies";
-    public string Description => "Gespeicherte Cookies je Website – Löschen beendet aktive Anmeldungen.";
+    public string Name => Loc.T("privacy.cookies.name");
+    public string Description => Loc.T("privacy.cookies.description");
     public bool RequiresConfirmation => true;
 
     public bool IsAvailable => ChromiumCookieDbs().Any() || FirefoxCookieDbs().Any();

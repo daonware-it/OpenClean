@@ -123,3 +123,9 @@ StyleCopReport.xml
 [Dd]esktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+## OpenClean — lokale/benutzerspezifische Laufzeitdaten
+# Die Laufzeit-Einstellungen liegen in %AppData%\OpenClean\settings.json (außerhalb des
+# Repos). Falls dennoch eine lokale settings-Datei im Projektbaum landet, nicht committen.
+settings.local.json
+**/settings.local.json

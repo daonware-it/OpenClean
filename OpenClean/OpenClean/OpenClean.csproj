@@ -16,7 +16,15 @@
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
         <Version>0.5.0</Version>
+        <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
+        <NeutralLanguage>de</NeutralLanguage>
     </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Sprachdateien: je eine JSON-Datei pro Sprache, als eingebettete Ressource
+             (logischer Name OpenClean.Resources.Strings.<code>.json). -->
+        <EmbeddedResource Include="Resources\Strings\*.json" />
+    </ItemGroup>
 
     <ItemGroup>
         <!-- SQLite-Zugriff für Browser-Datenbanken (Verlauf, Cookies) -->

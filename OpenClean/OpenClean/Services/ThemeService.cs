@@ -65,11 +65,24 @@ public static class ThemeService
         Current = theme;
     }
 
-    /// <summary>Schaltet zwischen Hell und Dunkel um und liefert das neue Theme.</summary>
+    /// <summary>Schaltet zwischen Hell und Dunkel um, speichert die Wahl und liefert das neue Theme.</summary>
     public static AppTheme Toggle()
     {
         ApplyTheme(Current == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark);
+        SettingsService.Instance.Current.Theme = Current.ToString();
+        SettingsService.Instance.Save();
         return Current;
+    }
+
+    /// <summary>
+    /// Ermittelt das beim Start anzuwendende Theme: gespeicherte Wahl (settings.json) →
+    /// sonst die Windows-App-Modus-Einstellung.
+    /// </summary>
+    public static AppTheme DetectStartupTheme()
+    {
+        if (Enum.TryParse(SettingsService.Instance.Current.Theme, out AppTheme saved))
+            return saved;
+        return DetectWindowsTheme();
     }
 
     /// <summary>

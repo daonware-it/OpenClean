@@ -52,16 +52,25 @@ public sealed class StartupItemViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                _reportError($"»{Entry.Name}« konnte nicht geändert werden: {ex.Message}");
+                _reportError(Loc.T("startup.error.changeFailed", Entry.Name, ex.Message));
                 OnPropertyChanged(); // UI auf alten Wert zurücksetzen
             }
         }
     }
 
     public string StatusDisplay =>
-        CanToggle ? (IsEnabled ? "Aktiviert" : "Deaktiviert")
-        : Entry.Location is StartupLocation.HkcuRunOnce or StartupLocation.HklmRunOnce ? "Einmalig"
-        : "Richtlinie";
+        CanToggle ? (IsEnabled ? Loc.T("startup.state.enabled") : Loc.T("startup.state.disabled"))
+        : Entry.Location is StartupLocation.HkcuRunOnce or StartupLocation.HklmRunOnce ? Loc.T("startup.state.once")
+        : Loc.T("startup.state.policy");
 
     private void Toggle() => IsEnabled = !IsEnabled;
+
+    /// <summary>Aktualisiert nach einem Sprachwechsel alle Anzeigetexte des Eintrags.</summary>
+    public void Relocalize()
+    {
+        OnPropertyChanged(nameof(LocationDisplay));
+        OnPropertyChanged(nameof(PublisherDisplay));
+        OnPropertyChanged(nameof(ImpactDisplay));
+        OnPropertyChanged(nameof(StatusDisplay));
+    }
 }

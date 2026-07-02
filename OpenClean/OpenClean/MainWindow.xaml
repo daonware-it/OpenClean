@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OpenClean"
         xmlns:views="clr-namespace:OpenClean.Views"
+        xmlns:loc="clr-namespace:OpenClean.Services.Localization"
         mc:Ignorable="d"
         Title="OpenClean" Height="760" Width="1180"
         MinHeight="620" MinWidth="980"
@@ -33,12 +34,12 @@
         <Grid Grid.Row="0" Grid.Column="1" Background="{DynamicResource BgBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click"
-                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimieren">
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{loc:Loc titlebar.minimize}">
                     <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"
                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                 </Button>
                 <Button Style="{StaticResource WindowControlButton}" Click="MaximizeButton_Click"
-                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximieren">
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{loc:Loc titlebar.maximize}">
                     <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="10"
                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
                         <TextBlock.Style>
@@ -55,7 +56,7 @@
                     </TextBlock>
                 </Button>
                 <Button Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click"
-                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Schließen">
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{loc:Loc titlebar.close}">
                     <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"
                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                 </Button>
@@ -88,20 +89,28 @@
                     <StackPanel Orientation="Horizontal">
                         <ToggleButton x:Name="ThemeToggle" Style="{StaticResource ToggleSwitch}"
                                       VerticalAlignment="Center" Click="ThemeToggle_Click"
-                                      ToolTip="Design zwischen Hell und Dunkel umschalten" />
-                        <TextBlock x:Name="ThemeLabel" Text="🌙 Dunkel"
+                                      ToolTip="{loc:Loc theme.toggleTooltip}" />
+                        <TextBlock x:Name="ThemeLabel"
                                    FontFamily="{StaticResource AppFont}" FontSize="13"
                                    FontWeight="Medium"
                                    Foreground="{DynamicResource TextBrush}"
                                    VerticalAlignment="Center" Margin="12,0,0,0" />
                     </StackPanel>
-                    <TextBlock Text="v0.6.0 · Open Source" Style="{StaticResource MutedText}"
+
+                    <!-- Sprachauswahl -->
+                    <TextBlock Text="{loc:Loc sidebar.language}" Style="{StaticResource MutedText}"
+                               FontSize="10.5" FontWeight="SemiBold" Opacity="0.7" Margin="1,16,0,6" />
+                    <ComboBox Style="{StaticResource LanguageCombo}"
+                              ItemsSource="{Binding Languages, Source={x:Static loc:LocalizationManager.Instance}}"
+                              SelectedItem="{Binding CurrentLanguageOption, Source={x:Static loc:LocalizationManager.Instance}, Mode=TwoWay}" />
+
+                    <TextBlock Text="{loc:Loc sidebar.version}" Style="{StaticResource MutedText}"
                                FontSize="11" Margin="1,14,0,0" />
                 </StackPanel>
 
                 <!-- Nav -->
                 <StackPanel Margin="0,10,0,0">
-                    <TextBlock Text="NAVIGATION" Style="{StaticResource MutedText}"
+                    <TextBlock Text="{loc:Loc sidebar.navigation}" Style="{StaticResource MutedText}"
                                FontSize="10.5" FontWeight="SemiBold" Margin="26,0,0,8"
                                Opacity="0.7" />
                     <RadioButton x:Name="NavDashboard" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -111,7 +120,7 @@
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M3 3 H10 V10 H3 Z M14 3 H21 V8 H14 Z M14 12 H21 V21 H14 Z M3 14 H10 V21 H3 Z" />
-                            <TextBlock Text="Übersicht" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:Loc nav.overview}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavSystem" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -121,7 +130,7 @@
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M4 4 H20 V11 H4 Z M4 13 H20 V20 H4 Z M7 7.5 H7.01 M7 16.5 H7.01" />
-                            <TextBlock Text="Speicher &amp; RAM" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:Loc nav.storage}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavCleaner" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -131,7 +140,7 @@
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z M11 9 L11 18 M14 9 L13 18" />
-                            <TextBlock Text="Bereinigung" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:Loc nav.cleaner}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavStartup" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -141,7 +150,7 @@
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 3 L14 9 L20 9 L15 13 L17 20 L12 16 L7 20 L9 13 L4 9 L10 9 Z" />
-                            <TextBlock Text="Autostart" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:Loc nav.startup}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavPrivacy" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -151,7 +160,7 @@
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 2 L20 5 L20 11 C20 16 16 20 12 22 C8 20 4 16 4 11 L4 5 Z" />
-                            <TextBlock Text="Privatsphäre" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{loc:Loc nav.privacy}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>

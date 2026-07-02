@@ -15,8 +15,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class RecentFilesProvider : IPrivacyProvider
 {
-    public string Name => "Zuletzt verwendete Dateien";
-    public string Description => "Die Liste der zuletzt geöffneten Dateien und Ordner (Windows Recent).";
+    public string Name => Loc.T("privacy.recentFiles.name");
+    public string Description => Loc.T("privacy.recentFiles.description");
 
     // Es werden persistente Spuren gelöscht -> Bestätigung anfordern.
     public bool RequiresConfirmation => true;

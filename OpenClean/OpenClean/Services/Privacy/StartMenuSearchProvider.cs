@@ -17,8 +17,8 @@ namespace OpenClean.Services.Privacy;
 /// </summary>
 public sealed class StartMenuSearchProvider : IPrivacyProvider
 {
-    public string Name => "Startmenü-Suchverlauf";
-    public string Description => "Zuletzt in die Windows-Suche eingegebene Begriffe.";
+    public string Name => Loc.T("privacy.startMenuSearch.name");
+    public string Description => Loc.T("privacy.startMenuSearch.description");
 
     // Es werden persistente Spuren gelöscht -> Bestätigung anfordern.
     public bool RequiresConfirmation => true;

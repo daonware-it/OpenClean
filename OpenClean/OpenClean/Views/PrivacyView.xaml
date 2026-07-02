@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:OpenClean.Views"
+             xmlns:loc="clr-namespace:OpenClean.Services.Localization"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="900"
              Background="{DynamicResource BgBrush}"
@@ -19,14 +20,14 @@
         <!-- ===== Header ===== -->
         <Grid Grid.Row="0">
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Privatsphäre" Style="{StaticResource HeaderText}" FontSize="24" />
-                <TextBlock Text="Vorschau vor dem Löschen – du entscheidest, welche Spuren entfernt werden."
+                <TextBlock Text="{loc:Loc privacy.title}" Style="{StaticResource HeaderText}" FontSize="24" />
+                <TextBlock Text="{loc:Loc privacy.subtitle}"
                            Style="{StaticResource MutedText}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button Content="Analysieren" Style="{StaticResource SecondaryButton}"
+                <Button Content="{loc:Loc common.analyze}" Style="{StaticResource SecondaryButton}"
                         Command="{Binding ScanCommand}" />
-                <Button Content="Bereinigen" Style="{StaticResource PrimaryButton}"
+                <Button Content="{loc:Loc common.clean}" Style="{StaticResource PrimaryButton}"
                         Command="{Binding CleanCommand}" Margin="12,0,0,0" />
             </StackPanel>
         </Grid>
@@ -55,7 +56,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Zur Bereinigung ausgewählt" Style="{StaticResource MutedText}"
+                        <TextBlock Text="{loc:Loc privacy.selectedLabel}" Style="{StaticResource MutedText}"
                                    FontSize="11.5" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding SelectionSummary}" FontSize="19" FontWeight="SemiBold"
                                    Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
@@ -63,7 +64,7 @@
                     <Border Grid.Column="1" Background="{DynamicResource BgDeepBrush}" CornerRadius="8"
                             Padding="18,12" VerticalAlignment="Center">
                         <StackPanel>
-                            <TextBlock Text="Einträge" Style="{StaticResource MutedText}" FontSize="11"
+                            <TextBlock Text="{loc:Loc privacy.entries}" Style="{StaticResource MutedText}" FontSize="11"
                                        HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding SelectedCount}" FontSize="24" FontWeight="Bold"
                                        HorizontalAlignment="Center" />
@@ -84,10 +85,10 @@
             <!-- Auswahl-Werkzeuge über der Kategorie-Liste -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
                         Margin="0,0,8,10">
-                <Button Content="Alles auswählen" Style="{StaticResource SecondaryButton}"
+                <Button Content="{loc:Loc common.selectAll}" Style="{StaticResource SecondaryButton}"
                         Padding="12,6" FontSize="12.5"
                         Command="{Binding SelectAllCommand}" />
-                <Button Content="Alles abwählen" Style="{StaticResource SecondaryButton}"
+                <Button Content="{loc:Loc common.deselectAll}" Style="{StaticResource SecondaryButton}"
                         Padding="12,6" FontSize="12.5" Margin="10,0,0,0"
                         Command="{Binding DeselectAllCommand}" />
             </StackPanel>
@@ -107,7 +108,7 @@
                                         <!-- Kategorie in die Analyse einbeziehen -->
                                         <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                   VerticalAlignment="Center" Margin="0,0,14,0"
-                                                  ToolTip="In die Analyse einbeziehen" />
+                                                  ToolTip="{loc:Loc common.includeInAnalysis}" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding HeaderDisplay}" FontSize="14.5" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}"
@@ -115,14 +116,14 @@
                                         </StackPanel>
                                         <!-- master select-all -->
                                         <CheckBox Grid.Column="2" IsChecked="{Binding AllSelected, Mode=TwoWay}"
-                                                  IsThreeState="True" Content="Alle" VerticalAlignment="Center"
+                                                  IsThreeState="True" Content="{loc:Loc common.all}" VerticalAlignment="Center"
                                                   Margin="12,0,6,0" />
                                     </Grid>
                                 </Expander.Header>
 
                                 <!-- Preview rows -->
                                 <Grid Margin="14,0,14,12">
-                                    <TextBlock Text="Keine Einträge gefunden – nach dem Analysieren erscheinen hier die Spuren."
+                                    <TextBlock Text="{loc:Loc privacy.emptyPreview}"
                                                Style="{StaticResource MutedText}" Margin="34,10,0,10"
                                                Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                                     <Border Background="{DynamicResource BgDeepBrush}" CornerRadius="8"

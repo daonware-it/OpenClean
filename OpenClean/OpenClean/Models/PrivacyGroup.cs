@@ -37,7 +37,7 @@ public sealed class PrivacyGroup : ViewModelBase
     public string HeaderDisplay =>
         Items.Count == 0
             ? Name
-            : $"{Name} — {SelectedCount}/{Items.Count} ausgewählt";
+            : Loc.T("privacy.header.withItems", Name, SelectedCount, Items.Count);
 
     /// <summary>Tri-State-Auswahl auf Kategorie-Ebene (für die "Alle"-Checkbox).</summary>
     public bool? AllSelected
@@ -73,5 +73,13 @@ public sealed class PrivacyGroup : ViewModelBase
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(HeaderDisplay));
         OnPropertyChanged(nameof(AllSelected));
+    }
+
+    /// <summary>Aktualisiert Name/Beschreibung/Kopfzeile nach einem Sprachwechsel.</summary>
+    public void RefreshLabels()
+    {
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HeaderDisplay));
     }
 }

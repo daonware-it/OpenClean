@@ -21,7 +21,7 @@ public sealed class StartupViewModel : ViewModelBase
 {
     private readonly StartupService _service = new();
     private bool _isBusy;
-    private string _statusText = "Autostart-Programme werden geladen …";
+    private string _statusText = Loc.T("startup.status.loading");
     private StartupStatusFilter _statusFilter = StartupStatusFilter.Alle;
 
     public ObservableCollection<StartupItemViewModel> Entries { get; } = new();
@@ -86,7 +86,7 @@ public sealed class StartupViewModel : ViewModelBase
     public async Task LoadAsync()
     {
         IsBusy = true;
-        StatusText = "Autostart-Programme werden geladen …";
+        StatusText = Loc.T("startup.status.loading");
 
         var entries = await Task.Run(() => _service.GetEntries());
 
@@ -103,8 +103,22 @@ public sealed class StartupViewModel : ViewModelBase
 
         IsBusy = false;
         StatusText = Entries.Count == 0
-            ? "Keine Autostart-Einträge gefunden."
-            : $"{Entries.Count} Autostart-Programm(e). {Entries.Count(e => e.IsEnabled)} aktiviert.";
+            ? Loc.T("startup.status.none")
+            : Loc.T("startup.status.summary", Entries.Count, Entries.Count(e => e.IsEnabled));
+    }
+
+    /// <summary>Aktualisiert nach einem Sprachwechsel Statuszeile und alle Einträge.</summary>
+    public void Relocalize()
+    {
+        foreach (var item in Entries)
+            item.Relocalize();
+
+        if (!IsBusy)
+        {
+            StatusText = Entries.Count == 0
+                ? Loc.T("startup.status.none")
+                : Loc.T("startup.status.summary", Entries.Count, Entries.Count(e => e.IsEnabled));
+        }
     }
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)

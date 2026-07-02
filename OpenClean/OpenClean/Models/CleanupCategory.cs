@@ -20,8 +20,15 @@ public enum CleanupKind
 /// </summary>
 public sealed class CleanupCategory : ViewModelBase
 {
-    public required string Name { get; init; }
-    public required string Description { get; init; }
+    /// <summary>Basis-Lokalisierungsschlüssel (z. B. "cat.windowsTemp").</summary>
+    public required string Key { get; init; }
+
+    /// <summary>Lokalisierter Anzeigename ("&lt;Key&gt;.name").</summary>
+    public string Name => Loc.T($"{Key}.name");
+
+    /// <summary>Lokalisierte Beschreibung ("&lt;Key&gt;.description").</summary>
+    public string Description => Loc.T($"{Key}.description");
+
     public CleanupKind Kind { get; init; } = CleanupKind.FileDeletion;
 
     /// <summary>Ob diese Kategorie überhaupt gescannt werden soll.</summary>
@@ -40,8 +47,9 @@ public sealed class CleanupCategory : ViewModelBase
 
     public string HeaderDisplay =>
         Items.Count == 0
-            ? $"{Name}"
-            : $"{Name} — {SelectedCount}/{Items.Count} Dateien, {Services.ByteFormatter.Format(SelectedBytes)}";
+            ? Name
+            : Loc.T("cleaner.header.withItems",
+                Name, SelectedCount, Items.Count, Services.ByteFormatter.Format(SelectedBytes));
 
     /// <summary>Tri-State-Auswahl auf Kategorie-Ebene (für die "Alle"-Checkbox).</summary>
     public bool? AllSelected
@@ -79,5 +87,13 @@ public sealed class CleanupCategory : ViewModelBase
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(HeaderDisplay));
         OnPropertyChanged(nameof(AllSelected));
+    }
+
+    /// <summary>Aktualisiert Name/Beschreibung/Kopfzeile nach einem Sprachwechsel.</summary>
+    public void RefreshLabels()
+    {
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HeaderDisplay));
     }
 }

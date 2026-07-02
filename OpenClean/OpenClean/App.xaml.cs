@@ -2,6 +2,7 @@ using System.Configuration;
 using System.Data;
 using System.Windows;
 using OpenClean.Services;
+using OpenClean.Services.Localization;
 
 namespace OpenClean;
 
@@ -14,8 +15,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Beim Start das Windows-App-Modus-Theme (Hell/Dunkel) übernehmen,
+        // Sprache festlegen (gespeicherte Auswahl → Windows-Sprache → Deutsch),
         // bevor das Hauptfenster gerendert wird.
-        ThemeService.ApplyTheme(ThemeService.DetectWindowsTheme());
+        LocalizationManager.Instance.InitializeStartupLanguage();
+
+        // Beim Start das gespeicherte Theme (settings.json) anwenden, sonst das
+        // Windows-App-Modus-Theme (Hell/Dunkel) – bevor das Hauptfenster gerendert wird.
+        ThemeService.ApplyTheme(ThemeService.DetectStartupTheme());
     }
 }

@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:OpenClean.Views"
+             xmlns:loc="clr-namespace:OpenClean.Services.Localization"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="900"
              Background="{DynamicResource BgBrush}"
@@ -59,27 +60,27 @@
         <!-- ===== Header ===== -->
         <Grid Grid.Row="0">
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Autostart" Style="{StaticResource HeaderText}" FontSize="24" />
-                <TextBlock Text="Programme, die mit Windows starten. Schalte ab, was du nicht brauchst."
+                <TextBlock Text="{loc:Loc startup.title}" Style="{StaticResource HeaderText}" FontSize="24" />
+                <TextBlock Text="{loc:Loc startup.subtitle}"
                            Style="{StaticResource MutedText}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Segmentierter Statusfilter -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="StatusFilter"
-                                 Content="Alle" Tag="8,0,0,8"
+                                 Content="{loc:Loc startup.filter.all}" Tag="8,0,0,8"
                                  IsChecked="{Binding StatusFilter, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Alle}" />
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="StatusFilter"
-                                 Content="Aktiviert" Tag="0" Margin="-1,0,0,0"
+                                 Content="{loc:Loc startup.filter.enabled}" Tag="0" Margin="-1,0,0,0"
                                  IsChecked="{Binding StatusFilter, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Aktiviert}" />
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="StatusFilter"
-                                 Content="Deaktiviert" Tag="0,8,8,0" Margin="-1,0,0,0"
+                                 Content="{loc:Loc startup.filter.disabled}" Tag="0,8,8,0" Margin="-1,0,0,0"
                                  IsChecked="{Binding StatusFilter, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Deaktiviert}" />
                 </StackPanel>
-                <Button Content="Aktualisieren" Style="{StaticResource SecondaryButton}"
+                <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
                         VerticalAlignment="Center"
                         Command="{Binding RefreshCommand}" />
             </StackPanel>
@@ -96,15 +97,15 @@
                     <ColumnDefinition Width="150" />
                     <ColumnDefinition Width="70" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="PROGRAMM" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="0" Text="{loc:Loc startup.col.program}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="1" Text="HERAUSGEBER" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="1" Text="{loc:Loc startup.col.publisher}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="2" Text="HERKUNFT" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="2" Text="{loc:Loc startup.col.origin}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="3" Text="STARTBELASTUNG" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="3" Text="{loc:Loc startup.col.impact}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="4" Text="STATUS" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="4" Text="{loc:Loc startup.col.status}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Right" />
             </Grid>
         </Border>
@@ -172,7 +173,7 @@
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding CanToggle}" Value="False">
                                                             <Setter Property="ToolTip"
-                                                                    Value="Per Gruppenrichtlinie gesetzt – nicht über OpenClean schaltbar" />
+                                                                    Value="{loc:Loc startup.policyTooltip}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -202,7 +203,7 @@
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
                                FontSize="12.5" />
-                    <TextBlock Text="Hinweis: Aufgabenplaner-Einträge werden derzeit nicht angezeigt."
+                    <TextBlock Text="{loc:Loc startup.taskSchedulerNote}"
                                Foreground="{DynamicResource TextMutedBrush}"
                                FontSize="10.5" Opacity="0.75" Margin="0,3,0,0" />
                 </StackPanel>

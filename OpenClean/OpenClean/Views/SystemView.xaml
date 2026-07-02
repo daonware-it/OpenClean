@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:conv="clr-namespace:OpenClean.Converters"
+             xmlns:loc="clr-namespace:OpenClean.Services.Localization"
              mc:Ignorable="d"
              d:DesignHeight="760" d:DesignWidth="900"
              Background="{DynamicResource BgBrush}"
@@ -54,11 +55,11 @@
         <!-- ===== Header ===== -->
         <Grid Grid.Row="0">
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Speicher &amp; RAM" Style="{StaticResource HeaderText}" FontSize="24" />
-                <TextBlock Text="Detailierte Anzeige – reine Information, keine „Optimierung“ oder „RAM-Booster“."
+                <TextBlock Text="{loc:Loc system.title}" Style="{StaticResource HeaderText}" FontSize="24" />
+                <TextBlock Text="{loc:Loc system.subtitle}"
                            Style="{StaticResource MutedText}" Margin="0,4,0,0" />
             </StackPanel>
-            <Button Content="Aktualisieren" Style="{StaticResource SecondaryButton}"
+            <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
                     HorizontalAlignment="Right" VerticalAlignment="Center"
                     Command="{Binding RefreshCommand}" />
         </Grid>
@@ -71,14 +72,14 @@
                     <StackPanel>
                         <Grid>
                             <StackPanel>
-                                <TextBlock Text="ARBEITSSPEICHER (RAM)" Style="{StaticResource TileCaption}" />
+                                <TextBlock Text="{loc:Loc system.ramHeading}" Style="{StaticResource TileCaption}" />
                                 <TextBlock Text="{Binding RamSummary}" Style="{StaticResource MutedText}"
                                            FontSize="13" Margin="0,4,0,0" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding RamPercentDisplay}" FontSize="34" FontWeight="Bold"
                                            VerticalAlignment="Center" />
-                                <Button Content="Aktualisieren" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
                                         Padding="12,7" FontSize="12" VerticalAlignment="Center" Margin="16,0,0,0"
                                         Command="{Binding RefreshRamCommand}" />
                             </StackPanel>
@@ -98,15 +99,15 @@
 
                         <Grid Margin="0,12,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Belegt: " Style="{StaticResource MutedText}" FontSize="12" />
+                                <TextBlock Text="{loc:Loc system.used}" Style="{StaticResource MutedText}" FontSize="12" />
                                 <TextBlock Text="{Binding UsedRam}" FontSize="12" FontWeight="SemiBold" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="Frei: " Style="{StaticResource MutedText}" FontSize="12" />
+                                <TextBlock Text="{loc:Loc system.free}" Style="{StaticResource MutedText}" FontSize="12" />
                                 <TextBlock Text="{Binding AvailableRam}" FontSize="12" FontWeight="SemiBold" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock Text="Gesamt: " Style="{StaticResource MutedText}" FontSize="12" />
+                                <TextBlock Text="{loc:Loc system.total}" Style="{StaticResource MutedText}" FontSize="12" />
                                 <TextBlock Text="{Binding TotalRam}" FontSize="12" FontWeight="SemiBold" />
                             </StackPanel>
                         </Grid>
@@ -114,7 +115,7 @@
                 </Border>
 
                 <!-- ===== Drives ===== -->
-                <TextBlock Text="Laufwerke" Style="{StaticResource HeaderText}" FontSize="16" Margin="2,22,0,0" />
+                <TextBlock Text="{loc:Loc system.drives}" Style="{StaticResource HeaderText}" FontSize="16" Margin="2,22,0,0" />
                 <TextBlock Text="{Binding DrivesSummary}" Style="{StaticResource MutedText}" Margin="2,4,0,0" />
 
                 <ItemsControl ItemsSource="{Binding Drives}" Margin="0,12,0,0">

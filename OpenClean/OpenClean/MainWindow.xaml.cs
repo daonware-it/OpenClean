@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using OpenClean.Services;
+using OpenClean.Services.Localization;
 
 namespace OpenClean;
 
@@ -17,6 +18,9 @@ public partial class MainWindow : Window
         // Toggle-Zustand am aktiven Theme ausrichten (beim Start aus Windows ermittelt).
         ThemeToggle.IsChecked = ThemeService.Current == AppTheme.Light;
         UpdateThemeLabel();
+
+        // Theme-Label bei Sprachwechsel neu setzen (Text kommt aus der Sprachdatei).
+        Loc.LanguageChanged += (_, _) => UpdateThemeLabel();
 
         // Maximiert ragt ein Fenster ohne Standard-Chrome sonst über den Bildschirmrand hinaus.
         StateChanged += (_, _) =>
@@ -40,6 +44,8 @@ public partial class MainWindow : Window
 
     private void UpdateThemeLabel()
     {
-        ThemeLabel.Text = ThemeService.Current == AppTheme.Light ? "☀ Hell" : "🌙 Dunkel";
+        ThemeLabel.Text = ThemeService.Current == AppTheme.Light
+            ? Loc.T("theme.light")
+            : Loc.T("theme.dark");
     }
 }

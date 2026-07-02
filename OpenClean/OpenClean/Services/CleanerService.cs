@@ -11,8 +11,8 @@ public sealed class CleanupReport
     public List<string> Skipped { get; } = new();
 
     public string Summary =>
-        $"{DeletedCount} Objekt(e) gelöscht, {ByteFormatter.Format(FreedBytes)} freigegeben." +
-        (Skipped.Count > 0 ? $" {Skipped.Count} übersprungen (in Benutzung / kein Zugriff)." : "");
+        Loc.T("cleanup.report.summary", DeletedCount, ByteFormatter.Format(FreedBytes)) +
+        (Skipped.Count > 0 ? Loc.T("cleanup.report.skipped", Skipped.Count) : "");
 }
 
 /// <summary>
@@ -49,11 +49,11 @@ public sealed class CleanerService
             {
                 if (category.Items.Any(i => i.IsSelected))
                 {
-                    progress?.Report(new CleanupProgress { CurrentPath = "Papierkorb …", Done = done, Total = total });
+                    progress?.Report(new CleanupProgress { CurrentPath = Loc.T("cleanup.recycleBin.progress"), Done = done, Total = total });
                     CleanRecycleBin(report, category);
                     // Alle ausgewählten Papierkorb-Items zählen als verarbeitet.
                     done += category.Items.Count(i => i.IsSelected);
-                    progress?.Report(new CleanupProgress { CurrentPath = "Papierkorb …", Done = done, Total = total });
+                    progress?.Report(new CleanupProgress { CurrentPath = Loc.T("cleanup.recycleBin.progress"), Done = done, Total = total });
                 }
                 continue;
             }
@@ -81,7 +81,7 @@ public sealed class CleanerService
         }
         catch
         {
-            report.Skipped.Add("Papierkorb");
+            report.Skipped.Add(Loc.T("cleanup.recycleBin.name"));
         }
     }
 
