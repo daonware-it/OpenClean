@@ -4,7 +4,9 @@
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
         <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
+        <!-- ImplicitUsings deaktiviert; globale Usings stehen explizit in
+             GlobalUsings.cs, damit JetBrains Rider sie zuverlässig auflöst. -->
+        <ImplicitUsings>disable</ImplicitUsings>
         <UseWPF>true</UseWPF>
         <!-- Erlaubt Restore/Analyse des Windows-Ziels auch auf Linux-Runnern
              (GitHub Automatic Dependency Submission, Dependabot). Beeinflusst
