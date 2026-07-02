@@ -143,6 +143,7 @@ public sealed class StartMenuSearchProvider : IPrivacyProvider
         try
         {
             using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
+            var affectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in selected)
             {
@@ -156,8 +157,22 @@ public sealed class StartMenuSearchProvider : IPrivacyProvider
                     if (key.GetValue(handle.ValueName) is null) continue;
                     key.DeleteValue(handle.ValueName, throwOnMissingValue: false);
                     deleted++;
+                    affectedKeys.Add(handle.KeyPath);
                 }
                 catch { /* einzelner Wert nicht löschbar -> überspringen */ }
+            }
+
+            // Nach dem Entfernen von Einträgen sind die Ordnungslisten (MRUList/MRUListEx)
+            // inkonsistent. Sicherste Variante: entfernen -> Windows baut sie neu auf.
+            foreach (var keyPath in affectedKeys)
+            {
+                try
+                {
+                    using var key = baseKey.OpenSubKey(keyPath, writable: true);
+                    key?.DeleteValue("MRUList", throwOnMissingValue: false);
+                    key?.DeleteValue("MRUListEx", throwOnMissingValue: false);
+                }
+                catch { /* nicht kritisch */ }
             }
         }
         catch { /* Registry nicht erreichbar -> gelöschte Anzahl zurückgeben */ }

@@ -58,7 +58,10 @@ public sealed class StartupItemViewModel : ViewModelBase
         }
     }
 
-    public string StatusDisplay => !CanToggle ? "Richtlinie" : IsEnabled ? "Aktiviert" : "Deaktiviert";
+    public string StatusDisplay =>
+        CanToggle ? (IsEnabled ? "Aktiviert" : "Deaktiviert")
+        : Entry.Location is StartupLocation.HkcuRunOnce or StartupLocation.HklmRunOnce ? "Einmalig"
+        : "Richtlinie";
 
     private void Toggle() => IsEnabled = !IsEnabled;
 }

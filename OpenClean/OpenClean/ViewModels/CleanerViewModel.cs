@@ -210,7 +210,10 @@ public sealed class CleanerViewModel : ViewModelBase
         if (double.IsNaN(remainingSeconds) || double.IsInfinity(remainingSeconds) || remainingSeconds < 0)
             return "";
         var remaining = TimeSpan.FromSeconds(remainingSeconds);
-        return $"ca. {remaining:mm\\:ss} verbleibend";
+        string text = remaining.TotalHours >= 1
+            ? remaining.ToString(@"h\:mm\:ss")
+            : remaining.ToString(@"mm\:ss");
+        return $"ca. {text} verbleibend";
     }
 
     private async Task CleanAsync()
@@ -247,7 +250,7 @@ public sealed class CleanerViewModel : ViewModelBase
         await ScanAsync();
 
         StatusText = report.Summary;
-        LastReportText = $"{report.DeletedCount} Datei(en) gelöscht · {ByteFormatter.Format(report.FreedBytes)} freigegeben"
+        LastReportText = $"{report.DeletedCount} Objekt(e) gelöscht · {ByteFormatter.Format(report.FreedBytes)} freigegeben"
             + (report.Skipped.Count > 0 ? $" · {report.Skipped.Count} übersprungen" : "");
         HasReport = true;
     }

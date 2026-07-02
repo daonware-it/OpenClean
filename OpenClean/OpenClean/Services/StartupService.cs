@@ -114,6 +114,10 @@ public sealed class StartupService
     private void ReadRunKey(List<StartupEntry> entries, RegistryHive hive, RegistryView view, string subPath,
         StartupLocation location, RegistryHive approvedHive, string approvedPath)
     {
+        // RunOnce wird von Windows NICHT über StartupApproved geschaltet: Einträge laufen
+        // beim nächsten Start genau einmal und lassen sich hier nicht deaktivieren.
+        bool isRunOnce = location is StartupLocation.HkcuRunOnce or StartupLocation.HklmRunOnce;
+
         using var baseKey = RegistryKey.OpenBaseKey(hive, view);
         using var key = baseKey.OpenSubKey(subPath);
         if (key is null) return;
@@ -128,7 +132,9 @@ public sealed class StartupService
                 if (string.IsNullOrWhiteSpace(command)) continue;
 
                 string? exe = ResolveExecutable(command);
-                var (enabled, approvedData) = ReadApproved(approvedHive, approvedPath, name);
+                var (enabled, approvedData) = isRunOnce
+                    ? (true, (byte[]?)null)
+                    : ReadApproved(approvedHive, approvedPath, name);
 
                 var entry = new StartupEntry
                 {
@@ -137,6 +143,7 @@ public sealed class StartupService
                     ExecutablePath = exe,
                     Location = location,
                     IsEnabled = enabled,
+                    CanToggle = !isRunOnce,
                     Publisher = PublisherForExe(exe)
                 };
                 AssignImpact(entry, approvedData);
@@ -393,7 +400,12 @@ public sealed class StartupService
                 if (fileName.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)) continue;
 
                 string? target = ResolveShortcut(file) ?? file;
-                var (enabled, approvedData) = ReadApproved(RegistryHive.CurrentUser, ApprovedFolder, fileName);
+                // Der Status des gemeinsamen Autostart-Ordners liegt unter HKLM, der des
+                // Benutzer-Ordners unter HKCU.
+                var approvedHive = location == StartupLocation.StartupFolderCommon
+                    ? RegistryHive.LocalMachine
+                    : RegistryHive.CurrentUser;
+                var (enabled, approvedData) = ReadApproved(approvedHive, ApprovedFolder, fileName);
 
                 string? folderExe = ResolveExecutable(target);
                 var entry = new StartupEntry
@@ -462,10 +474,8 @@ public sealed class StartupService
             StartupLocation.HkcuRun => (RegistryHive.CurrentUser, ApprovedRun, entry.Name),
             StartupLocation.HklmRun => (RegistryHive.LocalMachine, ApprovedRun, entry.Name),
             StartupLocation.HklmRunWow6432 => (RegistryHive.LocalMachine, ApprovedRun32, entry.Name),
-            StartupLocation.HkcuRunOnce => (RegistryHive.CurrentUser, ApprovedRun, entry.Name),
-            StartupLocation.HklmRunOnce => (RegistryHive.LocalMachine, ApprovedRun, entry.Name),
             StartupLocation.StartupFolderUser => (RegistryHive.CurrentUser, ApprovedFolder, entry.Name + ".lnk"),
-            StartupLocation.StartupFolderCommon => (RegistryHive.CurrentUser, ApprovedFolder, entry.Name + ".lnk"),
+            StartupLocation.StartupFolderCommon => (RegistryHive.LocalMachine, ApprovedFolder, entry.Name + ".lnk"),
             _ => (RegistryHive.CurrentUser, ApprovedRun, entry.Name)
         };
 
@@ -498,10 +508,13 @@ public sealed class StartupService
     /// </summary>
     private static void AssignImpact(StartupEntry entry, byte[]? approvedData)
     {
-        if (approvedData is { Length: > 12 })
+        // Nur ein erweiterter Blob (>= 20 Bytes) enthält ab Offset 12 einen Messwert.
+        // Bytes 4..11 sind die FILETIME des Deaktivierungszeitpunkts und dürfen
+        // niemals als Dauer interpretiert werden.
+        if (approvedData is { Length: >= 20 })
         {
             // Erweiterter Blob: gemessene Zeit (100ns-Einheiten) grob interpretieren.
-            long measured = BitConverter.ToInt64(approvedData, 12 <= approvedData.Length - 8 ? 12 : 4);
+            long measured = BitConverter.ToInt64(approvedData, 12);
             entry.ImpactIsEstimated = false;
             entry.Impact = measured switch
             {

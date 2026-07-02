@@ -56,9 +56,16 @@ public sealed class CleanupCategory : ViewModelBase
         }
         set
         {
+            // Bulk-Operation: pro-Item-Callbacks unterdrücken (sonst O(n²)-Benachrichtigungen),
+            // danach genau EINE Gesamt-Aktualisierung.
             bool target = value ?? false;
             foreach (var item in Items)
-                item.IsSelected = target;
+            {
+                var callback = item.SelectionChanged;
+                item.SelectionChanged = null;
+                try { item.IsSelected = target; }
+                finally { item.SelectionChanged = callback; }
+            }
             RefreshTotals();
         }
     }

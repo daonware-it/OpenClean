@@ -187,7 +187,7 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
                             {
                                 Name = SafeFileName(value),
                                 Detail = "Windows Media Player: " + value,
-                                Tag = new MediaHandle(MediaSource.WmpRegistry, subPath, name, value)
+                                Tag = new MediaHandle(MediaSource.WmpRegistry, "", subPath, name)
                             });
                         }
                         catch { /* einzelner Wert defekt -> überspringen */ }
