@@ -10,6 +10,12 @@ public sealed class CleanupReport
     public long FreedBytes { get; set; }
     public List<string> Skipped { get; } = new();
 
+    /// <summary>
+    /// Pfade der tatsächlich gelöschten Objekte – für den Bericht der automatischen
+    /// Reinigung („was wurde gelöscht"). Bei interaktiver Nutzung ungenutzt, aber billig.
+    /// </summary>
+    public List<string> Deleted { get; } = new();
+
     public string Summary =>
         Loc.T("cleanup.report.summary", DeletedCount, ByteFormatter.Format(FreedBytes)) +
         (Skipped.Count > 0 ? Loc.T("cleanup.report.skipped", Skipped.Count) : "");
@@ -78,6 +84,7 @@ public sealed class CleanerService
             RecycleBin.Empty();
             report.DeletedCount++;
             report.FreedBytes += size;
+            report.Deleted.Add(Loc.T("cleanup.recycleBin.itemPath"));
         }
         catch
         {
@@ -108,6 +115,7 @@ public sealed class CleanerService
 
             report.DeletedCount++;
             report.FreedBytes += item.SizeBytes;
+            report.Deleted.Add(item.FullPath);
         }
         catch
         {

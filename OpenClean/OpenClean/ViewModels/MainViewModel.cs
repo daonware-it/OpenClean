@@ -12,7 +12,8 @@ public enum AppSection
     Bereinigung,
     Autostart,
     Privatsphaere,
-    Updates
+    Updates,
+    Zeitplan
 }
 
 /// <summary>
@@ -27,6 +28,7 @@ public sealed class MainViewModel : ViewModelBase
     public StartupViewModel Startup { get; } = new();
     public PrivacyViewModel Privacy { get; } = new();
     public UpdaterViewModel Updater { get; } = new();
+    public ScheduleViewModel Schedule { get; } = new();
     public DashboardViewModel Dashboard { get; }
 
     public MainViewModel()
@@ -51,6 +53,7 @@ public sealed class MainViewModel : ViewModelBase
             Privacy.Relocalize();
             Startup.Relocalize();
             Updater.Relocalize();
+            Schedule.Relocalize();
         };
     }
 

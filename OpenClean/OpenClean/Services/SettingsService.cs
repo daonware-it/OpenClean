@@ -20,6 +20,46 @@ public sealed class AppSettings
 
     /// <summary>Zuletzt aktiver Bereich (Enum-Name von AppSection, z. B. "Bereinigung").</summary>
     public string? LastSection { get; set; }
+
+    /// <summary>
+    /// Konfiguration der geplanten automatischen Reinigung (v0.8.0). Immer vorhanden
+    /// (Default-Werte), damit ältere settings.json ohne diesen Block problemlos laden.
+    /// </summary>
+    public ScheduleSettings Schedule { get; set; } = new();
+}
+
+/// <summary>
+/// Einstellungen der geplanten automatischen Reinigung. Bewusst mit einfachen
+/// Werttypen/Strings gehalten, damit sie sich sauber als JSON persistieren lassen.
+/// </summary>
+public sealed class ScheduleSettings
+{
+    /// <summary>Ob die automatische Reinigung (geplante Aufgabe) aktiv ist.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Häufigkeit: "Daily", "Weekly" oder "Monthly".</summary>
+    public string Frequency { get; set; } = "Weekly";
+
+    /// <summary>Uhrzeit – Stunde (0–23).</summary>
+    public int Hour { get; set; } = 20;
+
+    /// <summary>Uhrzeit – Minute (0–59).</summary>
+    public int Minute { get; set; }
+
+    /// <summary>Wochentag für "Weekly" (0 = Sonntag … 6 = Samstag), analog zu <see cref="System.DayOfWeek"/>.</summary>
+    public int DayOfWeek { get; set; } = 1;
+
+    /// <summary>Tag des Monats für "Monthly" (1–28, aus Sicherheit nicht darüber).</summary>
+    public int DayOfMonth { get; set; } = 1;
+
+    /// <summary>Reinigungsprofil: "TempOnly", "Full" oder "Custom".</summary>
+    public string Profile { get; set; } = "TempOnly";
+
+    /// <summary>Bei "Custom" die gewählten Kategorie-Schlüssel (z. B. "cat.windowsTemp").</summary>
+    public List<string> CustomCategoryKeys { get; set; } = new();
+
+    /// <summary>Ob nach einer automatischen Reinigung eine Windows-Benachrichtigung erscheinen soll.</summary>
+    public bool Notify { get; set; } = true;
 }
 
 /// <summary>
