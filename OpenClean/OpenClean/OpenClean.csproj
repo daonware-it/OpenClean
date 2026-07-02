@@ -6,6 +6,10 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
+        <!-- Erlaubt Restore/Analyse des Windows-Ziels auch auf Linux-Runnern
+             (GitHub Automatic Dependency Submission, Dependabot). Beeinflusst
+             den eigentlichen Windows-Build nicht. Behebt NETSDK1100. -->
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
