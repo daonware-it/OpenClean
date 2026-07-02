@@ -18,6 +18,9 @@ public partial class App : Application
         // ohne Nachfrage, schreibt einen Bericht und beendet sich danach.
         if (IsAutoRun(e.Args))
         {
+            // Auch ohne UI die gespeicherte Sprache laden – sonst erscheint die
+            // Toast-Benachrichtigung immer in der Rückfallsprache (Englisch).
+            LocalizationManager.Instance.InitializeStartupLanguage();
             RunAutomaticCleanup();
             Shutdown();
             return;
