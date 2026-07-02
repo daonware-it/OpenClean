@@ -3,10 +3,13 @@
 # Baut die Anwendung bei jedem Push/PR auf "main" in Debug und Release,
 # veröffentlicht die Release-Variante als EXE und lädt sie als Artefakt hoch.
 #
-# Hinweis: Die ursprüngliche GitHub-Vorlage (.NET Core Desktop) enthält Schritte
-# für Unit-Tests, MSIX-Packaging und Code-Signing. Diese wurden entfernt, da das
+# Hinweis: Die Repo-Wurzel liegt eine Ebene über dem Projekt, daher enthalten
+# die Pfade unten das Präfix "OpenClean/".
+#
+# Die ursprüngliche GitHub-Vorlage (.NET Core Desktop) enthielt Schritte für
+# Unit-Tests, MSIX-Packaging und Code-Signing. Diese wurden entfernt, da das
 # Projekt weder ein Test-Projekt, ein Windows Application Packaging (.wapproj)
-# noch ein Signatur-Zertifikat besitzt. Bei Bedarf können sie später ergänzt werden.
+# noch ein Signatur-Zertifikat besitzt. Bei Bedarf später ergänzbar.
 
 name: .NET Desktop Build
 
@@ -29,8 +32,8 @@ jobs:
     runs-on: windows-latest
 
     env:
-      Solution_Name: OpenClean.sln
-      Project_Path: OpenClean/OpenClean.csproj
+      Solution_Name: OpenClean/OpenClean.sln
+      Project_Path: OpenClean/OpenClean/OpenClean.csproj
 
     steps:
     - name: Checkout
