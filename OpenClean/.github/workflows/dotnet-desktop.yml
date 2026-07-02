@@ -15,6 +15,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  # Ermöglicht das manuelle Starten über den "Run workflow"-Button im Actions-Tab
+  workflow_dispatch:
 
 jobs:
 
