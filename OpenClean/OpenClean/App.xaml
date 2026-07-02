@@ -241,6 +241,63 @@
                 </Setter>
             </Style>
 
+            <!-- ============ LoadingBar (animierter Indeterminate-Balken) ============ -->
+            <!-- Der Standard-ProgressBar-Style oben besitzt KEINE Indeterminate-Animation.
+                 Dieser Style zeigt einen dauerhaft wandernden Akzent-Schimmer, damit klar
+                 erkennbar ist, dass im Hintergrund etwas lädt. Breitenunabhängig über eine
+                 animierte RelativeTransform des Farbverlaufs. -->
+            <Style x:Key="LoadingBar" TargetType="ProgressBar">
+                <Setter Property="Height" Value="6" />
+                <Setter Property="IsIndeterminate" Value="True" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="Background" Value="{DynamicResource BgDeepBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ProgressBar">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="3" ClipToBounds="True">
+                                <Grid x:Name="PART_Track">
+                                    <!-- Determinate-Indikator (falls Value genutzt wird) -->
+                                    <Rectangle x:Name="PART_Indicator" HorizontalAlignment="Left"
+                                               Fill="{TemplateBinding Foreground}" RadiusX="3" RadiusY="3" />
+                                    <!-- Indeterminate-Schimmer -->
+                                    <Rectangle x:Name="shimmer" Visibility="Collapsed" RadiusX="3" RadiusY="3">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0.4,0" SpreadMethod="Repeat">
+                                                <LinearGradientBrush.RelativeTransform>
+                                                    <TranslateTransform X="-0.4" />
+                                                </LinearGradientBrush.RelativeTransform>
+                                                <GradientStop Offset="0.0" Color="#002ECC9B" />
+                                                <GradientStop Offset="0.5" Color="{DynamicResource AccentColor}" />
+                                                <GradientStop Offset="1.0" Color="#002ECC9B" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsIndeterminate" Value="True">
+                                    <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="shimmer" Property="Visibility" Value="Visible" />
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard Name="ShimmerSb">
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="shimmer"
+                                                    Storyboard.TargetProperty="(Shape.Fill).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
+                                                    From="-0.4" To="0.0" Duration="0:0:1.1" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <StopStoryboard BeginStoryboardName="ShimmerSb" />
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- ============ ScrollBar ============ -->
             <Style x:Key="ScrollThumb" TargetType="Thumb">
                 <Setter Property="Template">

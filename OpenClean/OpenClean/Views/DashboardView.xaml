@@ -63,6 +63,7 @@
     <Grid Margin="32,28,32,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -78,9 +79,54 @@
                     Command="{Binding RefreshCommand}" />
         </Grid>
 
-        <!-- ===== Scrollable content ===== -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,22,-12,0" Padding="0,0,12,24">
+        <!-- ===== Lade-Banner (deutlich sichtbar, während im Hintergrund analysiert wird) ===== -->
+        <Border Grid.Row="1" Margin="0,18,0,0" CornerRadius="10" Padding="20,15"
+                Background="{DynamicResource BgRaisedBrush}"
+                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
             <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <!-- pulsierender Punkt = „läuft im Hintergrund“ -->
+                    <Ellipse Width="12" Height="12" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center">
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Ellipse.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.2" Duration="0:0:0.8" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <TextBlock Text="Daten werden im Hintergrund geladen …"
+                               FontSize="14.5" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"
+                               VerticalAlignment="Center" Margin="13,0,0,0" />
+                </StackPanel>
+
+                <!-- animierter Indeterminate-Balken -->
+                <ProgressBar Style="{StaticResource LoadingBar}" Margin="0,13,0,0" />
+
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                           FontSize="12" Margin="0,9,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Scrollable content ===== -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,22,-12,0" Padding="0,0,12,24">
+            <StackPanel>
+                <!-- Inhalt wird während des Ladens gedimmt, damit das Banner heraussticht -->
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Opacity" Value="1" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
 
                 <!-- ===== Score card ===== -->
                 <Border Style="{StaticResource Card}" Padding="24">
@@ -281,7 +327,7 @@
 
                 <!-- ===== Status ===== -->
                 <StackPanel Orientation="Horizontal" Margin="2,14,0,0">
-                    <ProgressBar IsIndeterminate="True" Width="120" VerticalAlignment="Center"
+                    <ProgressBar Style="{StaticResource LoadingBar}" Width="140" VerticalAlignment="Center"
                                  Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
                     <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
                                FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />

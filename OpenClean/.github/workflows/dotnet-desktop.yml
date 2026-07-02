@@ -1,0 +1,63 @@
+# Build-Workflow für OpenClean (WPF, .NET 10)
+#
+# Baut die Anwendung bei jedem Push/PR auf "main" in Debug und Release,
+# veröffentlicht die Release-Variante als EXE und lädt sie als Artefakt hoch.
+#
+# Hinweis: Die ursprüngliche GitHub-Vorlage (.NET Core Desktop) enthält Schritte
+# für Unit-Tests, MSIX-Packaging und Code-Signing. Diese wurden entfernt, da das
+# Projekt weder ein Test-Projekt, ein Windows Application Packaging (.wapproj)
+# noch ein Signatur-Zertifikat besitzt. Bei Bedarf können sie später ergänzt werden.
+
+name: .NET Desktop Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: OpenClean.sln
+      Project_Path: OpenClean/OpenClean.csproj
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # .NET 10 SDK installieren (Ziel-Framework: net10.0-windows)
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # Abhängigkeiten wiederherstellen
+    - name: Restore
+      run: dotnet restore $env:Solution_Name
+
+    # Projekt bauen (ohne erneutes Restore)
+    - name: Build
+      run: dotnet build $env:Solution_Name --configuration ${{ matrix.configuration }} --no-restore
+
+    # Nur die Release-Variante veröffentlichen und als Artefakt hochladen
+    - name: Publish (Release only)
+      if: matrix.configuration == 'Release'
+      run: dotnet publish $env:Project_Path --configuration Release --no-build --output publish
+
+    - name: Upload build artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenClean-Release
+        path: publish
