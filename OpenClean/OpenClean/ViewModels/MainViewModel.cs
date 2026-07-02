@@ -13,7 +13,8 @@ public enum AppSection
     Autostart,
     Privatsphaere,
     Updates,
-    Zeitplan
+    Zeitplan,
+    Deinstallation
 }
 
 /// <summary>
@@ -29,6 +30,7 @@ public sealed class MainViewModel : ViewModelBase
     public PrivacyViewModel Privacy { get; } = new();
     public UpdaterViewModel Updater { get; } = new();
     public ScheduleViewModel Schedule { get; } = new();
+    public UninstallViewModel Uninstall { get; } = new();
     public DashboardViewModel Dashboard { get; }
 
     public MainViewModel()
@@ -54,6 +56,7 @@ public sealed class MainViewModel : ViewModelBase
             Startup.Relocalize();
             Updater.Relocalize();
             Schedule.Relocalize();
+            Uninstall.Relocalize();
         };
     }
 

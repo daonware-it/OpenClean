@@ -183,6 +183,16 @@
                             <TextBlock Text="{loc:Loc nav.schedule}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavUninstall" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Deinstallation}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M5 6 H19 L18 21 H6 Z M9 3 H15 V6 H9 Z M10 10 V17 M14 10 V17" />
+                            <TextBlock Text="{loc:Loc nav.uninstall}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -203,6 +213,8 @@
                                Visibility="{Binding IsChecked, ElementName=NavUpdates, Converter={StaticResource BoolToVis}}" />
             <views:ScheduleView DataContext="{Binding Schedule}"
                                 Visibility="{Binding IsChecked, ElementName=NavSchedule, Converter={StaticResource BoolToVis}}" />
+            <views:UninstallView DataContext="{Binding Uninstall}"
+                                 Visibility="{Binding IsChecked, ElementName=NavUninstall, Converter={StaticResource BoolToVis}}" />
         </Grid>
     </Grid>
 </Window>
