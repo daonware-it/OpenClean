@@ -2,18 +2,19 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ============ Light Palette ============ -->
-    <Color x:Key="BgDeepColor">#FFF0F0F3</Color>
-    <Color x:Key="BgColor">#FFF6F6F8</Color>
+    <Color x:Key="BgDeepColor">#FFE9EBF1</Color>
+    <Color x:Key="BgColor">#FFF3F4F8</Color>
     <Color x:Key="BgRaisedColor">#FFFFFFFF</Color>
     <Color x:Key="SurfaceColor">#FFFFFFFF</Color>
-    <Color x:Key="SurfaceHoverColor">#FFEDEDF2</Color>
-    <Color x:Key="BorderColor">#FFD8D8E0</Color>
-    <Color x:Key="AccentColor">#FF12A37A</Color>
-    <Color x:Key="AccentDarkColor">#FF0E7F5F</Color>
-    <Color x:Key="TextColor">#FF1C1C22</Color>
-    <Color x:Key="TextMutedColor">#FF6A6A78</Color>
-    <Color x:Key="DangerColor">#FFD64A38</Color>
-    <Color x:Key="WarnColor">#FFC8891A</Color>
+    <Color x:Key="SurfaceHoverColor">#FFEFF1F6</Color>
+    <Color x:Key="BorderColor">#FFE0E3EB</Color>
+    <Color x:Key="AccentColor">#FF0DA678</Color>
+    <Color x:Key="AccentDarkColor">#FF0A8760</Color>
+    <Color x:Key="AccentSoftColor">#1F0DA678</Color>
+    <Color x:Key="TextColor">#FF15171F</Color>
+    <Color x:Key="TextMutedColor">#FF667085</Color>
+    <Color x:Key="DangerColor">#FFDC4C3A</Color>
+    <Color x:Key="WarnColor">#FFC98A10</Color>
 
     <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource BgDeepColor}" />
     <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
@@ -23,6 +24,7 @@
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
     <SolidColorBrush x:Key="AccentDarkBrush" Color="{StaticResource AccentDarkColor}" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoftColor}" />
     <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />

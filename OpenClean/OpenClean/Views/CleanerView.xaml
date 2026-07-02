@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <local:FileNameConverter x:Key="FileName" />
     </UserControl.Resources>
-    <Grid Margin="32,28,32,0">
+    <Grid Margin="32,10,32,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -52,12 +52,6 @@
 
         <!-- Auswahl-Zusammenfassung -->
         <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#FF262D31" Offset="0" />
-                    <GradientStop Color="#FF2D2D38" Offset="1" />
-                </LinearGradientBrush>
-            </Border.Background>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

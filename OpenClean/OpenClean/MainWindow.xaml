@@ -11,17 +11,59 @@
         Background="{DynamicResource BgBrush}"
         WindowStartupLocation="CenterScreen"
         FontFamily="{StaticResource AppFont}">
+    <!-- Eigene Titelleiste: Standard-Chrome ausblenden, Drag/Resize/Snap bleiben erhalten -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6"
+                      GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
     <Window.Resources>
         <views:EnumToBoolConverter x:Key="EnumToBool" />
     </Window.Resources>
-    <Grid>
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="248" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <!-- ================= Titelleiste (Inhalt-Spalte) ================= -->
+        <Grid Grid.Row="0" Grid.Column="1" Background="{DynamicResource BgBrush}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimieren">
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </Button>
+                <Button Style="{StaticResource WindowControlButton}" Click="MaximizeButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximieren">
+                    <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="10"
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="&#xE922;" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Value="Maximized">
+                                        <Setter Property="Text" Value="&#xE923;" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+                <Button Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Schließen">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
         <!-- ================= Sidebar ================= -->
-        <Border Grid.Column="0" Background="{DynamicResource BgDeepBrush}"
+        <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Background="{DynamicResource BgDeepBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- Brand -->
@@ -53,7 +95,7 @@
                                    Foreground="{DynamicResource TextBrush}"
                                    VerticalAlignment="Center" Margin="12,0,0,0" />
                     </StackPanel>
-                    <TextBlock Text="v0.1.0 · Open Source" Style="{StaticResource MutedText}"
+                    <TextBlock Text="v0.1.Über · Open Source" Style="{StaticResource MutedText}"
                                FontSize="11" Margin="1,14,0,0" />
                 </StackPanel>
 
@@ -117,7 +159,7 @@
         </Border>
 
         <!-- ================= Content ================= -->
-        <Grid Grid.Column="1">
+        <Grid Grid.Row="1" Grid.Column="1">
             <views:DashboardView DataContext="{Binding Dashboard}"
                                  Visibility="{Binding IsChecked, ElementName=NavDashboard, Converter={StaticResource BoolToVis}}" />
             <views:SystemView DataContext="{Binding Dashboard}"

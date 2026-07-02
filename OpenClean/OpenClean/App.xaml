@@ -44,7 +44,7 @@
             <!-- ============ Primary Button (accent) ============ -->
             <Style x:Key="PrimaryButton" TargetType="Button">
                 <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
-                <Setter Property="Foreground" Value="#FF10261F" />
+                <Setter Property="Foreground" Value="#FF0C201A" />
                 <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiBold" />
@@ -55,15 +55,28 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                    CornerRadius="10" Padding="{TemplateBinding Padding}">
+                                <Border.Effect>
+                                    <DropShadowEffect x:Name="glow" BlurRadius="14" ShadowDepth="0"
+                                                      Opacity="0.28" Color="#FF34D399" />
+                                </Border.Effect>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDarkBrush}" />
                                 </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bd" Property="RenderTransform">
+                                        <Setter.Value>
+                                            <ScaleTransform ScaleX="0.97" ScaleY="0.97" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Setter TargetName="bd" Property="RenderTransformOrigin" Value="0.5,0.5" />
+                                </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter TargetName="bd" Property="Background" Value="{DynamicResource BorderBrush}" />
+                                    <Setter TargetName="bd" Property="Effect" Value="{x:Null}" />
                                     <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
                                     <Setter Property="Cursor" Value="Arrow" />
                                 </Trigger>
@@ -87,13 +100,16 @@
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bd" Background="{TemplateBinding Background}"
                                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                    CornerRadius="10" Padding="{TemplateBinding Padding}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
                                     <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
@@ -117,12 +133,12 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid>
-                                <Border x:Name="bar" Width="3" HorizontalAlignment="Left"
-                                        CornerRadius="2" Background="Transparent" Margin="0,7" />
-                                <Border x:Name="bd" Background="Transparent" CornerRadius="8"
+                                <Border x:Name="bd" Background="Transparent" CornerRadius="10"
                                         Margin="6,0,0,0" Padding="16,11">
                                     <ContentPresenter VerticalAlignment="Center" />
                                 </Border>
+                                <Border x:Name="bar" Width="3" HorizontalAlignment="Left"
+                                        CornerRadius="2" Background="Transparent" Margin="0,9" />
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
@@ -130,7 +146,7 @@
                                     <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                                     <Setter TargetName="bar" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                                     <Setter Property="FontWeight" Value="SemiBold" />
@@ -266,9 +282,9 @@
                                                 <LinearGradientBrush.RelativeTransform>
                                                     <TranslateTransform X="-0.4" />
                                                 </LinearGradientBrush.RelativeTransform>
-                                                <GradientStop Offset="0.0" Color="#002ECC9B" />
+                                                <GradientStop Offset="0.0" Color="#0034D399" />
                                                 <GradientStop Offset="0.5" Color="{DynamicResource AccentColor}" />
-                                                <GradientStop Offset="1.0" Color="#002ECC9B" />
+                                                <GradientStop Offset="1.0" Color="#0034D399" />
                                             </LinearGradientBrush>
                                         </Rectangle.Fill>
                                     </Rectangle>
@@ -343,7 +359,53 @@
                 <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="2" Direction="270"
+                                          Opacity="0.18" Color="#FF000000" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============ Fenster-Buttons (eigene Titelleiste) ============ -->
+            <Style x:Key="WindowControlButton" TargetType="Button">
+                <Setter Property="Width" Value="46" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="WindowCloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#FFE81123" />
+                                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <!-- ============ Expander ============ -->
