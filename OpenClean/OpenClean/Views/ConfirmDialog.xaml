@@ -37,7 +37,7 @@
                           Fill="{DynamicResource DangerBrush}"
                           Data="M9 2 L15 2 L16 4 L21 4 L21 6 L3 6 L3 4 L8 4 Z M5 7 L19 7 L18 22 L6 22 Z" />
                 </Border>
-                <TextBlock Text="{loc:Loc confirm.title}" VerticalAlignment="Center" Margin="14,0,0,0"
+                <TextBlock x:Name="TitleText" Text="{loc:Loc confirm.title}" VerticalAlignment="Center" Margin="14,0,0,0"
                            FontSize="18" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextBrush}" />
             </StackPanel>
@@ -52,7 +52,7 @@
                         Margin="0,24,0,0">
                 <Button Content="{loc:Loc confirm.cancel}" Style="{StaticResource SecondaryButton}"
                         IsCancel="True" Click="OnCancel" />
-                <Button Content="{loc:Loc confirm.confirm}" Style="{StaticResource PrimaryButton}"
+                <Button x:Name="ConfirmButton" Content="{loc:Loc confirm.confirm}" Style="{StaticResource PrimaryButton}"
                         IsDefault="True" Click="OnConfirm" Margin="12,0,0,0" />
             </StackPanel>
         </Grid>

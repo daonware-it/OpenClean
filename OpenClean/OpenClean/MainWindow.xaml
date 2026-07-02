@@ -163,6 +163,16 @@
                             <TextBlock Text="{loc:Loc nav.privacy}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavUpdates" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Updates}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M12 3 V14 M12 14 L8 10 M12 14 L16 10 M4 18 H20 V21 H4 Z" />
+                            <TextBlock Text="{loc:Loc nav.updates}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -179,6 +189,8 @@
                                Visibility="{Binding IsChecked, ElementName=NavStartup, Converter={StaticResource BoolToVis}}" />
             <views:PrivacyView DataContext="{Binding Privacy}"
                                Visibility="{Binding IsChecked, ElementName=NavPrivacy, Converter={StaticResource BoolToVis}}" />
+            <views:UpdaterView DataContext="{Binding Updater}"
+                               Visibility="{Binding IsChecked, ElementName=NavUpdates, Converter={StaticResource BoolToVis}}" />
         </Grid>
     </Grid>
 </Window>

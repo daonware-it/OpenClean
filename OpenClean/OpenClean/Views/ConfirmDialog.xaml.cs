@@ -9,18 +9,28 @@ namespace OpenClean.Views;
 /// </summary>
 public partial class ConfirmDialog : Window
 {
-    private ConfirmDialog(string message)
+    private ConfirmDialog(string message, string? title, string? confirmText)
     {
         InitializeComponent();
         MessageText.Text = message;
+
+        if (!string.IsNullOrEmpty(title))
+        {
+            TitleText.Text = title;
+            Title = title;
+        }
+
+        if (!string.IsNullOrEmpty(confirmText))
+            ConfirmButton.Content = confirmText;
     }
 
     /// <summary>
     /// Zeigt den Dialog modal an und gibt true zurück, wenn der Nutzer „Bereinigen“ wählt.
+    /// Optional lassen sich Titel und Bestätigungstext überschreiben.
     /// </summary>
-    public static bool Show(Window? owner, string message)
+    public static bool Show(Window? owner, string message, string? title = null, string? confirmText = null)
     {
-        var dialog = new ConfirmDialog(message);
+        var dialog = new ConfirmDialog(message, title, confirmText);
         if (owner is not null && owner != dialog)
             dialog.Owner = owner;
         return dialog.ShowDialog() == true;
