@@ -6,7 +6,7 @@ namespace OpenClean.Services;
 
 /// <summary>
 /// Agent (Berichterstatter): persistiert die Berichte der automatischen Reinigungen
-/// unter <c>%AppData%\OpenClean\</c> – als strukturierte JSON-Historie
+/// im Datenverzeichnis (<see cref="AppPaths.DataDirectory"/>) – als strukturierte JSON-Historie
 /// (<c>autoclean-reports.json</c>, für die Anzeige im UI) sowie als menschenlesbares
 /// Textprotokoll (<c>autoclean.log</c>). Alle Dateioperationen sind gekapselt: ein
 /// Schreib-/Lesefehler darf die eigentliche Reinigung niemals stören.
@@ -28,11 +28,8 @@ public sealed class AutoCleanReportStore
 
     public AutoCleanReportStore()
     {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OpenClean");
-        JsonPath = Path.Combine(dir, "autoclean-reports.json");
-        LogPath = Path.Combine(dir, "autoclean.log");
+        JsonPath = AppPaths.GetDataFile("autoclean-reports.json");
+        LogPath = AppPaths.GetDataFile("autoclean.log");
     }
 
     /// <summary>Lädt die gespeicherten Berichte (neueste zuerst); bei Fehler eine leere Liste.</summary>

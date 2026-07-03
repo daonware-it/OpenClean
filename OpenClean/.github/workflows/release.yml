@@ -1,0 +1,99 @@
+name: Release
+
+# Baut bei einem Versions-Tag (v*) die Portable-Version (self-contained Single-File)
+# als .zip sowie einen Inno-Setup-Installer (.exe) und hängt beide an ein GitHub-Release.
+# Manuell auslösbar (workflow_dispatch) zum Testen ohne Tag.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # nötig, um das Release zu erstellen und Assets hochzuladen
+
+jobs:
+  release:
+    # WPF / net10.0-windows erfordert einen Windows-Runner (EnableWindowsTargeting
+    # erlaubt nur Restore/Analyse auf Linux, nicht den eigentlichen Build).
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: .NET 10 einrichten
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Version aus dem Tag ableiten (v0.11.0 -> 0.11.0). Bei manuellem Lauf
+      # ohne Tag Fallback auf die csproj-Version 0.11.0.
+      - name: Version bestimmen
+        id: version
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref_name }}"
+          if ($ref -match '^v(\d+\.\d+\.\d+.*)$') {
+            $version = $Matches[1]
+          } else {
+            $version = '0.11.0'
+          }
+          Write-Host "Version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore
+        run: dotnet restore OpenClean/OpenClean.csproj
+
+      - name: Portable veröffentlichen (self-contained Single-File)
+        run: >
+          dotnet publish OpenClean/OpenClean.csproj
+          -p:PublishProfile=Portable
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish/portable
+
+      # Installer aus dem Publish-Verzeichnis bauen, BEVOR der Portable-Marker
+      # gesetzt wird -> installierte App nutzt %AppData% (kein Portable-Modus).
+      - name: Inno Setup installieren
+        run: choco install innosetup --no-progress -y
+
+      - name: Installer bauen
+        run: >
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          /DAppVersion=${{ steps.version.outputs.version }}
+          /DSourceDir=..\publish\portable
+          installer\OpenClean.iss
+        shell: pwsh
+
+      # Portable-Marker setzen und Portable-.zip packen (mit Marker -> Portable-Modus).
+      - name: Portable-ZIP packen
+        shell: pwsh
+        run: |
+          $out = "publish/portable"
+          Set-Content -Path "$out/OpenClean.portable" -Value "Diese Datei aktiviert den Portable-Modus von OpenClean. Nicht loeschen." -Encoding UTF8
+          $zip = "OpenClean-Portable-${{ steps.version.outputs.version }}.zip"
+          if (Test-Path $zip) { Remove-Item $zip }
+          Compress-Archive -Path "$out/*" -DestinationPath $zip
+          Write-Host "Erzeugt: $zip"
+
+      - name: Artefakte hochladen (Build-Log)
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclean-${{ steps.version.outputs.version }}
+          path: |
+            OpenClean-Portable-${{ steps.version.outputs.version }}.zip
+            installer/Output/OpenClean-Setup-${{ steps.version.outputs.version }}.exe
+          if-no-files-found: error
+
+      - name: GitHub-Release veröffentlichen
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OpenClean ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            OpenClean-Portable-${{ steps.version.outputs.version }}.zip
+            installer/Output/OpenClean-Setup-${{ steps.version.outputs.version }}.exe

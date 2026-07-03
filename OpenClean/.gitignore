@@ -61,6 +61,11 @@ publish/
 *.pubxml
 *.publishproj
 PublishScripts/
+# Ausnahme: das versionierte Portable-Publish-Profil (v0.11.0) muss eingecheckt bleiben.
+!OpenClean/Properties/PublishProfiles/Portable.pubxml
+
+## Installer output (Inno Setup)
+installer/Output/
 
 ## NuGet
 *.nupkg

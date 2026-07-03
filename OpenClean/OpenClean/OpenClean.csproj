@@ -15,7 +15,7 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
-        <Version>0.10.0</Version>
+        <Version>0.11.0</Version>
         <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
         <NeutralLanguage>de</NeutralLanguage>
     </PropertyGroup>

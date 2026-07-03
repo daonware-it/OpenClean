@@ -5,22 +5,19 @@ namespace OpenClean.Services;
 
 /// <summary>
 /// Schreibt ein einfaches Textprotokoll aller Update-Versuche als <c>updates.log</c>
-/// unter <c>%AppData%\OpenClean\</c>. Alle Dateioperationen sind gekapselt – bei
+/// im Datenverzeichnis (<see cref="AppPaths.DataDirectory"/>). Alle Dateioperationen sind gekapselt – bei
 /// fehlendem Zugriff oder Datenträgerfehlern wird nie eine Ausnahme durchgereicht
 /// (das Protokoll ist optional und darf den Update-Vorgang nie stören).
 /// </summary>
 public sealed class UpdateLogService
 {
-    /// <summary>Vollständiger Pfad der Protokolldatei (<c>%AppData%\OpenClean\updates.log</c>).</summary>
+    /// <summary>Vollständiger Pfad der Protokolldatei (<c>updates.log</c> im Datenverzeichnis).</summary>
     public string LogFilePath { get; }
 
     /// <summary>Bestimmt den Protokollpfad; die Datei wird erst beim ersten <see cref="Log"/> angelegt.</summary>
     public UpdateLogService()
     {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OpenClean");
-        LogFilePath = Path.Combine(dir, "updates.log");
+        LogFilePath = AppPaths.GetDataFile("updates.log");
     }
 
     /// <summary>

@@ -63,8 +63,9 @@ public sealed class ScheduleSettings
 }
 
 /// <summary>
-/// Lädt/speichert <see cref="AppSettings"/> als <c>settings.json</c> unter
-/// <c>%AppData%\OpenClean\</c>. Ersetzt die frühere Registry-Persistenz. Alle Datei-
+/// Lädt/speichert <see cref="AppSettings"/> als <c>settings.json</c> im
+/// Datenverzeichnis (<see cref="AppPaths.DataDirectory"/> – portabel neben der EXE,
+/// sonst <c>%AppData%\OpenClean\</c>). Ersetzt die frühere Registry-Persistenz. Alle Datei-
 /// operationen sind gekapselt – bei fehlender/kaputter Datei oder fehlendem Zugriff
 /// wird nie eine Ausnahme durchgereicht (Rückfall auf leere Defaults).
 /// </summary>
@@ -84,10 +85,7 @@ public sealed class SettingsService
 
     private SettingsService()
     {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OpenClean");
-        _filePath = Path.Combine(dir, "settings.json");
+        _filePath = AppPaths.GetDataFile("settings.json");
         _settings = Load();
     }
 
