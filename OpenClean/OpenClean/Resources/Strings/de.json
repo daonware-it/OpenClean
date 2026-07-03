@@ -366,5 +366,31 @@
   "duplicates.confirm.title": "Duplikate löschen",
   "duplicates.confirm.body": "{0} markierte Kopie(n) mit insgesamt {1} werden endgültig gelöscht.\nPro Gruppe bleibt immer mindestens eine Kopie erhalten.\n\nMöchtest du fortfahren?",
 
-  "error.unexpected": "Unerwarteter Fehler: {0}"
+  "error.unexpected": "Unerwarteter Fehler: {0}",
+
+  "premium.locked.title": "Premium-Funktion",
+  "premium.locked.schedule.pitch": "Die geplante automatische Reinigung räumt deinen PC regelmäßig im Hintergrund auf – täglich, wöchentlich oder monatlich, mit frei wählbarem Reinigungsprofil und Berichten zu jedem Lauf.",
+  "premium.locked.body": "Dieses Feature ist Teil von OpenClean Premium (Einmalkauf, kein Abo). Mit dem Kauf unterstützt du die Weiterentwicklung – der Kern von OpenClean bleibt kostenlos und Open Source.",
+  "premium.locked.grandfathered.title": "Dein bestehender Zeitplan läuft weiter",
+  "premium.locked.grandfathered.body": "Du hast die geplante Reinigung schon vor der Premium-Einführung genutzt. Dein eingerichteter Zeitplan bleibt aktiv und reinigt weiterhin automatisch. Zum Ändern der Einstellungen wird Premium benötigt.",
+  "premium.locked.disableSchedule": "Zeitplan deaktivieren",
+  "premium.locked.scheduleDisabled": "Der Zeitplan wurde deaktiviert und die geplante Aufgabe entfernt.",
+  "premium.action.buy": "Premium kaufen",
+  "premium.action.activate": "Lizenz aktivieren",
+  "premium.activate.title": "Lizenz aktivieren",
+  "premium.activate.hint": "Gib den Lizenzschlüssel ein, den du nach dem Kauf per E-Mail erhalten hast (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Bei der Aktivierung werden ausschließlich übertragen: Lizenzschlüssel, ein anonymer Geräte-Hash und die App-Version. Keine Telemetrie, kein Konto.",
+  "premium.activate.action": "Aktivieren",
+  "premium.activate.working": "Lizenz wird aktiviert …",
+  "premium.activate.success": "Lizenz aktiviert – Premium ist freigeschaltet.",
+  "premium.activate.downloadingModule": "Premium-Modul wird heruntergeladen …",
+  "premium.error.invalidKey": "Der Lizenzschlüssel ist ungültig oder wurde widerrufen.",
+  "premium.error.deviceLimit": "Geräte-Limit erreicht: Diese Lizenz ist bereits auf der maximalen Anzahl Geräte aktiviert. Deaktiviere zuerst ein anderes Gerät.",
+  "premium.error.network": "Der Lizenzserver ist gerade nicht erreichbar. Bitte prüfe deine Internetverbindung und versuche es erneut.",
+  "premium.error.moduleLoad": "Das Premium-Modul konnte nicht geladen werden. Bitte versuche es erneut.",
+  "premium.module.missingTitle": "Premium-Modul fehlt",
+  "premium.module.missingBody": "Deine Lizenz ist gültig, aber das Premium-Modul ist auf diesem Gerät nicht vorhanden oder beschädigt. Es kann jetzt neu heruntergeladen werden.",
+  "premium.module.retry": "Modul erneut herunterladen",
+  "premium.batch.locked": "Die gleichzeitige Deinstallation mehrerer Programme ist eine Premium-Funktion. Einzelne Programme kannst du weiterhin kostenlos deinstallieren.",
+  "schedule.auto.skippedNoLicense": "Geplante Reinigung übersprungen: keine aktive Premium-Lizenz."
 }

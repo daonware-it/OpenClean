@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
+using OpenClean.Contracts;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Licensing;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -253,6 +255,24 @@ public sealed class UninstallViewModel : ViewModelBase
     {
         var selected = Apps.Where(a => a.IsSelected && a.CanUninstall).Select(a => a.Model).ToList();
         if (selected.Count == 0) return;
+
+        // Premium-Gate: die Batch-Deinstallation MEHRERER Programme erfordert eine Lizenz;
+        // ein einzelnes Programm bleibt (wie die Einzel-Deinstallation) kostenlos.
+        if (selected.Count > 1 &&
+            !PremiumService.Instance.HasFeature(PremiumContract.FeatureBatchUninstall))
+        {
+            bool wantsActivation = ConfirmDialog.Show(
+                Application.Current?.MainWindow,
+                Loc.T("premium.batch.locked"),
+                Loc.T("premium.locked.title"),
+                Loc.T("premium.action.activate"));
+            if (wantsActivation)
+                ActivationDialog.Show(Application.Current?.MainWindow);
+
+            // Nach dem Dialog erneut prüfen – ohne frisch aktivierte Lizenz abbrechen.
+            if (!PremiumService.Instance.HasFeature(PremiumContract.FeatureBatchUninstall))
+                return;
+        }
 
         bool confirmed = ConfirmDialog.Show(
             Application.Current?.MainWindow,

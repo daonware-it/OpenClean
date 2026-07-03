@@ -27,6 +27,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Plugin-Vertrag für das Premium-Modul (OpenClean.Premium.dll, Closed Source,
+             wird nach Lizenz-Aktivierung von daonware.de geladen). -->
+        <ProjectReference Include="..\OpenClean.Contracts\OpenClean.Contracts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <!-- SQLite-Zugriff für Browser-Datenbanken (Verlauf, Cookies) -->
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
         <!-- Native SQLite-Binärdatei auf den gepatchten Build heben; behebt

@@ -181,6 +181,10 @@
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 2 A10 10 0 1 0 12 22 A10 10 0 1 0 12 2 Z M12 6 L12 12 L17 15" />
                             <TextBlock Text="{loc:Loc nav.schedule}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                            <!-- Schloss-Symbol, solange Premium nicht freigeschaltet ist -->
+                            <TextBlock Text="&#x1F512;" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"
+                                       Opacity="0.7" ToolTip="{loc:Loc premium.locked.title}"
+                                       Visibility="{Binding IsScheduleUnlocked, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavUninstall" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -221,8 +225,9 @@
                                Visibility="{Binding IsChecked, ElementName=NavPrivacy, Converter={StaticResource BoolToVis}}" />
             <views:UpdaterView DataContext="{Binding Updater}"
                                Visibility="{Binding IsChecked, ElementName=NavUpdates, Converter={StaticResource BoolToVis}}" />
-            <views:ScheduleView DataContext="{Binding Schedule}"
-                                Visibility="{Binding IsChecked, ElementName=NavSchedule, Converter={StaticResource BoolToVis}}" />
+            <!-- Zeitplan: Premium-Modul-View oder Locked-Ansicht (siehe MainViewModel) -->
+            <ContentControl Content="{Binding ScheduleSectionContent}" Focusable="False"
+                            Visibility="{Binding IsChecked, ElementName=NavSchedule, Converter={StaticResource BoolToVis}}" />
             <views:UninstallView DataContext="{Binding Uninstall}"
                                  Visibility="{Binding IsChecked, ElementName=NavUninstall, Converter={StaticResource BoolToVis}}" />
             <views:DuplicatesView DataContext="{Binding Duplicates}"

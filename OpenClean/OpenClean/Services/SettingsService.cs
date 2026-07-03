@@ -26,6 +26,14 @@ public sealed class AppSettings
     /// (Default-Werte), damit ältere settings.json ohne diesen Block problemlos laden.
     /// </summary>
     public ScheduleSettings Schedule { get; set; } = new();
+
+    /// <summary>
+    /// Grandfathering (v0.12.0): true, wenn diese Installation die geplante Reinigung
+    /// bereits vor der Premium-Einführung aktiv nutzte – der Alt-Zeitplan läuft dann ohne
+    /// Lizenz weiter. null = Migration noch nicht gelaufen (wird beim ersten UI-Start
+    /// einmalig ermittelt und gesetzt).
+    /// </summary>
+    public bool? ScheduleGrandfathered { get; set; }
 }
 
 /// <summary>

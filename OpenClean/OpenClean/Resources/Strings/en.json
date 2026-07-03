@@ -365,5 +365,31 @@
   "duplicates.confirm.title": "Delete duplicates",
   "duplicates.confirm.body": "{0} marked copy(ies) totaling {1} will be permanently deleted.\nAt least one copy per group is always kept.\n\nDo you want to continue?",
 
-  "error.unexpected": "Unexpected error: {0}"
+  "error.unexpected": "Unexpected error: {0}",
+
+  "premium.locked.title": "Premium feature",
+  "premium.locked.schedule.pitch": "Scheduled automatic cleaning tidies up your PC regularly in the background – daily, weekly or monthly, with a configurable cleaning profile and a report for every run.",
+  "premium.locked.body": "This feature is part of OpenClean Premium (one-time purchase, no subscription). Your purchase supports further development – the core of OpenClean stays free and open source.",
+  "premium.locked.grandfathered.title": "Your existing schedule keeps running",
+  "premium.locked.grandfathered.body": "You were already using scheduled cleaning before Premium was introduced. Your configured schedule stays active and keeps cleaning automatically. Changing its settings requires Premium.",
+  "premium.locked.disableSchedule": "Disable schedule",
+  "premium.locked.scheduleDisabled": "The schedule has been disabled and the scheduled task removed.",
+  "premium.action.buy": "Buy Premium",
+  "premium.action.activate": "Activate license",
+  "premium.activate.title": "Activate license",
+  "premium.activate.hint": "Enter the license key you received by e-mail after your purchase (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Activation transmits only: the license key, an anonymous device hash and the app version. No telemetry, no account.",
+  "premium.activate.action": "Activate",
+  "premium.activate.working": "Activating license …",
+  "premium.activate.success": "License activated – Premium is unlocked.",
+  "premium.activate.downloadingModule": "Downloading Premium module …",
+  "premium.error.invalidKey": "The license key is invalid or has been revoked.",
+  "premium.error.deviceLimit": "Device limit reached: this license is already active on the maximum number of devices. Deactivate another device first.",
+  "premium.error.network": "The license server is currently unreachable. Please check your internet connection and try again.",
+  "premium.error.moduleLoad": "The Premium module could not be loaded. Please try again.",
+  "premium.module.missingTitle": "Premium module missing",
+  "premium.module.missingBody": "Your license is valid, but the Premium module is missing or damaged on this device. It can be downloaded again now.",
+  "premium.module.retry": "Download module again",
+  "premium.batch.locked": "Uninstalling several programs at once is a Premium feature. You can still uninstall individual programs for free.",
+  "schedule.auto.skippedNoLicense": "Scheduled cleaning skipped: no active Premium license."
 }

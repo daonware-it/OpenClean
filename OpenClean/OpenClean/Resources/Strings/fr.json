@@ -365,5 +365,31 @@
   "duplicates.confirm.title": "Supprimer les doublons",
   "duplicates.confirm.body": "{0} copie(s) marquées totalisant {1} seront définitivement supprimées.\nAu moins une copie par groupe est toujours conservée.\n\nVoulez-vous continuer ?",
 
-  "error.unexpected": "Erreur inattendue : {0}"
+  "error.unexpected": "Erreur inattendue : {0}",
+
+  "premium.locked.title": "Fonction Premium",
+  "premium.locked.schedule.pitch": "Le nettoyage automatique planifié range votre PC régulièrement en arrière-plan – quotidien, hebdomadaire ou mensuel, avec un profil de nettoyage configurable et un rapport pour chaque exécution.",
+  "premium.locked.body": "Cette fonction fait partie d'OpenClean Premium (achat unique, sans abonnement). Votre achat soutient le développement – le cœur d'OpenClean reste gratuit et open source.",
+  "premium.locked.grandfathered.title": "Votre planification existante continue de fonctionner",
+  "premium.locked.grandfathered.body": "Vous utilisiez déjà le nettoyage planifié avant l'introduction de Premium. Votre planification configurée reste active et continue de nettoyer automatiquement. La modification des réglages nécessite Premium.",
+  "premium.locked.disableSchedule": "Désactiver la planification",
+  "premium.locked.scheduleDisabled": "La planification a été désactivée et la tâche planifiée supprimée.",
+  "premium.action.buy": "Acheter Premium",
+  "premium.action.activate": "Activer la licence",
+  "premium.activate.title": "Activer la licence",
+  "premium.activate.hint": "Saisissez la clé de licence reçue par e-mail après votre achat (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Lors de l'activation, seuls sont transmis : la clé de licence, un hachage anonyme de l'appareil et la version de l'application. Pas de télémétrie, pas de compte.",
+  "premium.activate.action": "Activer",
+  "premium.activate.working": "Activation de la licence …",
+  "premium.activate.success": "Licence activée – Premium est débloqué.",
+  "premium.activate.downloadingModule": "Téléchargement du module Premium …",
+  "premium.error.invalidKey": "La clé de licence est invalide ou a été révoquée.",
+  "premium.error.deviceLimit": "Limite d'appareils atteinte : cette licence est déjà active sur le nombre maximal d'appareils. Désactivez d'abord un autre appareil.",
+  "premium.error.network": "Le serveur de licences est actuellement injoignable. Vérifiez votre connexion internet et réessayez.",
+  "premium.error.moduleLoad": "Le module Premium n'a pas pu être chargé. Veuillez réessayer.",
+  "premium.module.missingTitle": "Module Premium manquant",
+  "premium.module.missingBody": "Votre licence est valide, mais le module Premium est absent ou endommagé sur cet appareil. Il peut être téléchargé à nouveau maintenant.",
+  "premium.module.retry": "Retélécharger le module",
+  "premium.batch.locked": "La désinstallation simultanée de plusieurs programmes est une fonction Premium. Vous pouvez toujours désinstaller gratuitement des programmes individuels.",
+  "schedule.auto.skippedNoLicense": "Nettoyage planifié ignoré : aucune licence Premium active."
 }
