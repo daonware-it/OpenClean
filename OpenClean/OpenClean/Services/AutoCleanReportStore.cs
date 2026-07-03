@@ -71,6 +71,24 @@ public sealed class AutoCleanReportStore
         return report;
     }
 
+    /// <summary>
+    /// Protokolliert einen ÜBERSPRUNGENEN geplanten Lauf (z. B. fehlende Premium-Lizenz)
+    /// im Textprotokoll – ein geplanter Lauf darf nie spurlos ausfallen.
+    /// </summary>
+    public void LogSkippedRun(string reason, DateTime timestamp)
+    {
+        try
+        {
+            EnsureDir(LogPath);
+            string stamp = timestamp.ToString("yyyy-MM-dd HH:mm:ss");
+            File.AppendAllText(LogPath, $"{stamp}  ÜBERSPRUNGEN: {reason}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Protokoll ist optional -> Fehler still verwerfen.
+        }
+    }
+
     private void SaveJson(AutoCleanReport report)
     {
         try

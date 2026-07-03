@@ -365,5 +365,31 @@
   "duplicates.confirm.title": "Usuń duplikaty",
   "duplicates.confirm.body": "{0} oznaczonych kopii o łącznym rozmiarze {1} zostanie trwale usuniętych.\nZawsze zachowywana jest co najmniej jedna kopia w każdej grupie.\n\nCzy chcesz kontynuować?",
 
-  "error.unexpected": "Nieoczekiwany błąd: {0}"
+  "error.unexpected": "Nieoczekiwany błąd: {0}",
+
+  "premium.locked.title": "Funkcja Premium",
+  "premium.locked.schedule.pitch": "Zaplanowane automatyczne czyszczenie regularnie porządkuje Twój komputer w tle – codziennie, co tydzień lub co miesiąc, z konfigurowalnym profilem czyszczenia i raportem z każdego uruchomienia.",
+  "premium.locked.body": "Ta funkcja jest częścią OpenClean Premium (jednorazowy zakup, bez subskrypcji). Zakupem wspierasz rozwój – rdzeń OpenClean pozostaje darmowy i open source.",
+  "premium.locked.grandfathered.title": "Twój istniejący harmonogram nadal działa",
+  "premium.locked.grandfathered.body": "Korzystałeś z zaplanowanego czyszczenia jeszcze przed wprowadzeniem Premium. Skonfigurowany harmonogram pozostaje aktywny i nadal czyści automatycznie. Zmiana ustawień wymaga Premium.",
+  "premium.locked.disableSchedule": "Wyłącz harmonogram",
+  "premium.locked.scheduleDisabled": "Harmonogram został wyłączony, a zaplanowane zadanie usunięte.",
+  "premium.action.buy": "Kup Premium",
+  "premium.action.activate": "Aktywuj licencję",
+  "premium.activate.title": "Aktywuj licencję",
+  "premium.activate.hint": "Wpisz klucz licencyjny otrzymany e-mailem po zakupie (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Podczas aktywacji przesyłane są wyłącznie: klucz licencyjny, anonimowy hash urządzenia i wersja aplikacji. Bez telemetrii, bez konta.",
+  "premium.activate.action": "Aktywuj",
+  "premium.activate.working": "Aktywowanie licencji …",
+  "premium.activate.success": "Licencja aktywowana – Premium jest odblokowane.",
+  "premium.activate.downloadingModule": "Pobieranie modułu Premium …",
+  "premium.error.invalidKey": "Klucz licencyjny jest nieprawidłowy lub został unieważniony.",
+  "premium.error.deviceLimit": "Osiągnięto limit urządzeń: ta licencja jest już aktywna na maksymalnej liczbie urządzeń. Najpierw dezaktywuj inne urządzenie.",
+  "premium.error.network": "Serwer licencji jest obecnie niedostępny. Sprawdź połączenie z internetem i spróbuj ponownie.",
+  "premium.error.moduleLoad": "Nie udało się załadować modułu Premium. Spróbuj ponownie.",
+  "premium.module.missingTitle": "Brak modułu Premium",
+  "premium.module.missingBody": "Twoja licencja jest ważna, ale moduł Premium nie istnieje na tym urządzeniu lub jest uszkodzony. Można go teraz pobrać ponownie.",
+  "premium.module.retry": "Pobierz moduł ponownie",
+  "premium.batch.locked": "Jednoczesna deinstalacja kilku programów to funkcja Premium. Pojedyncze programy nadal odinstalujesz za darmo.",
+  "schedule.auto.skippedNoLicense": "Pominięto zaplanowane czyszczenie: brak aktywnej licencji Premium."
 }

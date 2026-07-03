@@ -365,5 +365,31 @@
   "duplicates.confirm.title": "Excluir duplicados",
   "duplicates.confirm.body": "{0} cópia(s) marcadas totalizando {1} serão excluídas permanentemente.\nPelo menos uma cópia por grupo é sempre mantida.\n\nDeseja continuar?",
 
-  "error.unexpected": "Erro inesperado: {0}"
+  "error.unexpected": "Erro inesperado: {0}",
+
+  "premium.locked.title": "Função Premium",
+  "premium.locked.schedule.pitch": "A limpeza automática agendada organiza o teu PC regularmente em segundo plano – diária, semanal ou mensalmente, com um perfil de limpeza configurável e relatórios de cada execução.",
+  "premium.locked.body": "Esta função faz parte do OpenClean Premium (compra única, sem assinatura). Com a compra apoias o desenvolvimento – o núcleo do OpenClean continua gratuito e open source.",
+  "premium.locked.grandfathered.title": "O teu agendamento existente continua a funcionar",
+  "premium.locked.grandfathered.body": "Já usavas a limpeza agendada antes da introdução do Premium. O teu agendamento configurado continua ativo e a limpar automaticamente. Para alterar as definições é necessário o Premium.",
+  "premium.locked.disableSchedule": "Desativar agendamento",
+  "premium.locked.scheduleDisabled": "O agendamento foi desativado e a tarefa agendada removida.",
+  "premium.action.buy": "Comprar Premium",
+  "premium.action.activate": "Ativar licença",
+  "premium.activate.title": "Ativar licença",
+  "premium.activate.hint": "Introduz a chave de licença que recebeste por e-mail após a compra (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Na ativação são transmitidos apenas: a chave de licença, um hash anónimo do dispositivo e a versão da app. Sem telemetria, sem conta.",
+  "premium.activate.action": "Ativar",
+  "premium.activate.working": "A ativar a licença …",
+  "premium.activate.success": "Licença ativada – o Premium está desbloqueado.",
+  "premium.activate.downloadingModule": "A transferir o módulo Premium …",
+  "premium.error.invalidKey": "A chave de licença é inválida ou foi revogada.",
+  "premium.error.deviceLimit": "Limite de dispositivos atingido: esta licença já está ativa no número máximo de dispositivos. Desativa primeiro outro dispositivo.",
+  "premium.error.network": "O servidor de licenças está indisponível de momento. Verifica a tua ligação à internet e tenta novamente.",
+  "premium.error.moduleLoad": "Não foi possível carregar o módulo Premium. Tenta novamente.",
+  "premium.module.missingTitle": "Módulo Premium em falta",
+  "premium.module.missingBody": "A tua licença é válida, mas o módulo Premium está em falta ou danificado neste dispositivo. Pode ser transferido novamente agora.",
+  "premium.module.retry": "Transferir módulo novamente",
+  "premium.batch.locked": "Desinstalar vários programas ao mesmo tempo é uma função Premium. Continuas a poder desinstalar programas individuais gratuitamente.",
+  "schedule.auto.skippedNoLicense": "Limpeza agendada ignorada: sem licença Premium ativa."
 }

@@ -365,5 +365,31 @@
   "duplicates.confirm.title": "Borrar duplicados",
   "duplicates.confirm.body": "{0} copia(s) marcadas con un total de {1} se borrarán de forma definitiva.\nSiempre se conserva al menos una copia por grupo.\n\n¿Quieres continuar?",
 
-  "error.unexpected": "Error inesperado: {0}"
+  "error.unexpected": "Error inesperado: {0}",
+
+  "premium.locked.title": "Función Premium",
+  "premium.locked.schedule.pitch": "La limpieza automática programada ordena tu PC regularmente en segundo plano: diaria, semanal o mensualmente, con un perfil de limpieza configurable e informes de cada ejecución.",
+  "premium.locked.body": "Esta función forma parte de OpenClean Premium (pago único, sin suscripción). Con tu compra apoyas el desarrollo: el núcleo de OpenClean sigue siendo gratuito y de código abierto.",
+  "premium.locked.grandfathered.title": "Tu programación existente sigue funcionando",
+  "premium.locked.grandfathered.body": "Ya usabas la limpieza programada antes de la introducción de Premium. Tu programación configurada sigue activa y limpiando automáticamente. Para cambiar su configuración se necesita Premium.",
+  "premium.locked.disableSchedule": "Desactivar programación",
+  "premium.locked.scheduleDisabled": "La programación se ha desactivado y la tarea programada se ha eliminado.",
+  "premium.action.buy": "Comprar Premium",
+  "premium.action.activate": "Activar licencia",
+  "premium.activate.title": "Activar licencia",
+  "premium.activate.hint": "Introduce la clave de licencia que recibiste por correo tras la compra (OPENCLEAN-XXXX-XXXX-XXXX-XXXX).",
+  "premium.activate.privacy": "Al activar solo se transmiten: la clave de licencia, un hash anónimo del dispositivo y la versión de la app. Sin telemetría, sin cuenta.",
+  "premium.activate.action": "Activar",
+  "premium.activate.working": "Activando licencia …",
+  "premium.activate.success": "Licencia activada: Premium está desbloqueado.",
+  "premium.activate.downloadingModule": "Descargando el módulo Premium …",
+  "premium.error.invalidKey": "La clave de licencia no es válida o ha sido revocada.",
+  "premium.error.deviceLimit": "Límite de dispositivos alcanzado: esta licencia ya está activa en el número máximo de dispositivos. Desactiva primero otro dispositivo.",
+  "premium.error.network": "El servidor de licencias no está disponible en este momento. Comprueba tu conexión a internet e inténtalo de nuevo.",
+  "premium.error.moduleLoad": "No se pudo cargar el módulo Premium. Inténtalo de nuevo.",
+  "premium.module.missingTitle": "Falta el módulo Premium",
+  "premium.module.missingBody": "Tu licencia es válida, pero el módulo Premium falta o está dañado en este dispositivo. Puede descargarse de nuevo ahora.",
+  "premium.module.retry": "Descargar módulo de nuevo",
+  "premium.batch.locked": "Desinstalar varios programas a la vez es una función Premium. Puedes seguir desinstalando programas individuales gratis.",
+  "schedule.auto.skippedNoLicense": "Limpieza programada omitida: no hay licencia Premium activa."
 }

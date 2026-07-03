@@ -1,5 +1,7 @@
 using System.Windows;
+using OpenClean.Contracts;
 using OpenClean.Services;
+using OpenClean.Services.Licensing;
 using OpenClean.Services.Localization;
 
 namespace OpenClean;
@@ -30,6 +32,10 @@ public partial class App : Application
         // bevor das Hauptfenster gerendert wird.
         LocalizationManager.Instance.InitializeStartupLanguage();
 
+        // Einmalige Grandfathering-Migration (v0.12.0): Installationen, die die geplante
+        // Reinigung schon vor der Premium-Einführung nutzten, behalten ihren Zeitplan.
+        MigrateScheduleGrandfathering();
+
         // Beim Start das gespeicherte Theme (settings.json) anwenden, sonst das
         // Windows-App-Modus-Theme (Hell/Dunkel) – bevor das Hauptfenster gerendert wird.
         ThemeService.ApplyTheme(ThemeService.DetectStartupTheme());
@@ -55,7 +61,22 @@ public partial class App : Application
     {
         try
         {
-            var schedule = SettingsService.Instance.Current.Schedule;
+            var settings = SettingsService.Instance.Current;
+            var schedule = settings.Schedule;
+
+            // Premium-Prüfung (rein offline über das signierte Lizenz-Token): ohne Lizenz
+            // und ohne Grandfathering wird NICHT gereinigt – aber nie stillschweigend:
+            // Toast + Protokolleintrag, die geplante Aufgabe bleibt bestehen (der Nutzer
+            // entfernt sie bewusst über den gesperrten Zeitplan-Bereich).
+            if (!IsScheduledCleanupAllowed(settings))
+            {
+                new AutoCleanReportStore().LogSkippedRun(
+                    Loc.T("schedule.auto.skippedNoLicense"), DateTime.Now);
+                new ToastService().Show(
+                    Loc.T("schedule.toast.title"),
+                    Loc.T("schedule.auto.skippedNoLicense"));
+                return;
+            }
 
             var result = new AutoCleanService().Run(schedule);
             var report = new AutoCleanReportStore().Add(schedule.Profile, result, DateTime.Now);
@@ -72,5 +93,29 @@ public partial class App : Application
         {
             // Ein unbeaufsichtigter Lauf darf niemals mit einem Fehlerdialog hängen bleiben.
         }
+    }
+
+    /// <summary>
+    /// True, wenn der geplante Lauf ausgeführt werden darf: gültige Premium-Lizenz mit
+    /// Zeitplan-Feature ODER Grandfathering (Bestandsnutzer aus v0.11; solange die
+    /// Migration noch nicht lief, zählt ein aktivierter Alt-Zeitplan ebenfalls).
+    /// </summary>
+    private static bool IsScheduledCleanupAllowed(AppSettings settings)
+        => LicenseService.Instance.HasFeature(PremiumContract.FeatureSchedule) ||
+           settings.ScheduleGrandfathered == true ||
+           (settings.ScheduleGrandfathered is null && settings.Schedule.Enabled);
+
+    /// <summary>
+    /// Setzt das Grandfathering-Flag einmalig: true, wenn die geplante Reinigung vor dem
+    /// Update auf v0.12 bereits genutzt wurde (Einstellung aktiv oder Aufgabe registriert).
+    /// </summary>
+    private static void MigrateScheduleGrandfathering()
+    {
+        var settings = SettingsService.Instance.Current;
+        if (settings.ScheduleGrandfathered is not null) return;
+
+        bool legacy = settings.Schedule.Enabled || new ScheduleTaskService().IsRegistered();
+        settings.ScheduleGrandfathered = legacy;
+        SettingsService.Instance.Save();
     }
 }

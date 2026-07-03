@@ -1,4 +1,7 @@
+using OpenClean.Contracts;
 using OpenClean.Services;
+using OpenClean.Services.Licensing;
+using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
 
@@ -26,11 +29,13 @@ public sealed class MainViewModel : ViewModelBase
 {
     private AppSection _currentSection = AppSection.Uebersicht;
 
+    private object? _scheduleSectionContent;
+    private LockedScheduleViewModel? _lockedSchedule;
+
     public CleanerViewModel Cleaner { get; } = new();
     public StartupViewModel Startup { get; } = new();
     public PrivacyViewModel Privacy { get; } = new();
     public UpdaterViewModel Updater { get; } = new();
-    public ScheduleViewModel Schedule { get; } = new();
     public UninstallViewModel Uninstall { get; } = new();
     public DuplicatesViewModel Duplicates { get; } = new();
     public DashboardViewModel Dashboard { get; }
@@ -48,6 +53,16 @@ public sealed class MainViewModel : ViewModelBase
         Dashboard = new DashboardViewModel(section => CurrentSection = section, Cleaner);
         Dashboard.EnsureAnalyzed();
 
+        // Zeitplan-Bereich: Premium-Modul (wenn lizenziert + geladen) oder Locked-Ansicht.
+        // Lizenzänderungen (Aktivierung im Dialog, Hintergrund-Refresh) bauen den Bereich neu.
+        BuildScheduleSection();
+        PremiumService.Instance.Changed += (_, _) =>
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher is null || dispatcher.CheckAccess()) BuildScheduleSection();
+            else dispatcher.InvokeAsync(BuildScheduleSection);
+        };
+
         // Bei Sprachwechsel die berechneten Texte aller Bereiche neu aufbauen.
         Loc.LanguageChanged += (_, _) =>
         {
@@ -57,7 +72,7 @@ public sealed class MainViewModel : ViewModelBase
             Privacy.Relocalize();
             Startup.Relocalize();
             Updater.Relocalize();
-            Schedule.Relocalize();
+            _lockedSchedule?.Relocalize();
             Uninstall.Relocalize();
             Duplicates.Relocalize();
         };
@@ -77,7 +92,45 @@ public sealed class MainViewModel : ViewModelBase
 
             if (value == AppSection.Uebersicht)
                 Dashboard.EnsureAnalyzed();
+
+            // Beim Öffnen des Premium-Bereichs bei Bedarf das Lizenz-Token im
+            // Hintergrund erneuern (nie beim App-Start, nie blockierend).
+            if (value == AppSection.Zeitplan)
+                PremiumService.Instance.RefreshInBackground();
         }
+    }
+
+    /// <summary>
+    /// Inhalt des Zeitplan-Bereichs: die View des Premium-Moduls oder – ohne gültige
+    /// Lizenz bzw. ohne Modul – die <see cref="LockedSectionView"/> mit Kauf/Aktivierung.
+    /// </summary>
+    public object? ScheduleSectionContent
+    {
+        get => _scheduleSectionContent;
+        private set => SetProperty(ref _scheduleSectionContent, value);
+    }
+
+    /// <summary>True, wenn der Zeitplan freigeschaltet ist (steuert das Schloss-Symbol in der Nav).</summary>
+    public bool IsScheduleUnlocked => _scheduleSectionContent is not null and not LockedSectionView;
+
+    private void BuildScheduleSection()
+    {
+        IPremiumSection? section = PremiumService.Instance.HasFeature(PremiumContract.FeatureSchedule)
+            ? PremiumService.Instance.GetSection(nameof(AppSection.Zeitplan))
+            : null;
+
+        if (section is not null)
+        {
+            _lockedSchedule = null;
+            ScheduleSectionContent = section.CreateView();
+        }
+        else
+        {
+            _lockedSchedule = new LockedScheduleViewModel();
+            ScheduleSectionContent = new LockedSectionView { DataContext = _lockedSchedule };
+        }
+
+        OnPropertyChanged(nameof(IsScheduleUnlocked));
     }
 
     public string AppTitle => "OpenClean";
