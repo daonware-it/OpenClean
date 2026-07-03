@@ -57,7 +57,7 @@ public sealed class LicenseService
     /// existiert AUSSCHLIESSLICH auf dem Server – Tokens lassen sich daher nicht fälschen.
     /// </summary>
     private const string PublicKeySpkiBase64 =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPjpL97s8Am+zp51VJ452mr04UvEqtZhu+7+5oywCKukvje7xUNALA+3tx1NyQjEbr8seZ9ykVQ2zU0Vnqwkqbg==";
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZrbF8dm0h71FSJtZSReDN5uvcXwIRsOMQExFRnxlHbqeB9pOhwHDUUQzY9/52WQisXck2eCUrEbR3i/f+TQ9rg==";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
