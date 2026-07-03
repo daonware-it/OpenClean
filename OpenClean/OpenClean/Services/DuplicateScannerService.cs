@@ -114,22 +114,11 @@ public sealed class DuplicateScannerService
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var files = new List<DuplicateFile>();
 
-        var options = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        };
-
         foreach (var folder in folders)
         {
             if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) continue;
 
-            IEnumerable<FileInfo> enumeration;
-            try { enumeration = new DirectoryInfo(folder).EnumerateFiles("*", options); }
-            catch { continue; }
-
-            foreach (var info in enumeration)
+            foreach (var info in EnumerateFilesSafe(folder, ct))
             {
                 ct.ThrowIfCancellationRequested();
                 try
@@ -155,6 +144,47 @@ public sealed class DuplicateScannerService
         }
 
         return files;
+    }
+
+    /// <summary>
+    /// Rekursive Datei-Enumeration, die pro Verzeichnis abgesichert ist. Die eingebaute
+    /// Rekursion (RecurseSubdirectories) bricht mit IOException ab, sobald ein einzelnes
+    /// Verzeichnis nicht lesbar ist (IgnoreInaccessible deckt nur Zugriffsverweigerungen
+    /// ab) – beim Scan ganzer Laufwerke wie C:\ passiert genau das. Hier wird stattdessen
+    /// jedes Verzeichnis einzeln gelesen und bei Fehlern nur dieses übersprungen.
+    /// Symlinks/Junctions werden weiterhin nicht verfolgt.
+    /// </summary>
+    private static IEnumerable<FileInfo> EnumerateFilesSafe(string root, CancellationToken ct)
+    {
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = false,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(new DirectoryInfo(root));
+
+        while (pending.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var dir = pending.Pop();
+
+            FileInfo[] dirFiles;
+            try { dirFiles = dir.GetFiles("*", options); }
+            catch { dirFiles = Array.Empty<FileInfo>(); }
+
+            foreach (var file in dirFiles)
+                yield return file;
+
+            DirectoryInfo[] subDirs;
+            try { subDirs = dir.GetDirectories("*", options); }
+            catch { subDirs = Array.Empty<DirectoryInfo>(); }
+
+            foreach (var sub in subDirs)
+                pending.Push(sub);
+        }
     }
 
     /// <summary>
