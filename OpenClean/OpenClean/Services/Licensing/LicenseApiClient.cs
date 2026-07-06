@@ -35,7 +35,7 @@ public enum LicenseApiError
 public sealed class LicenseApiClient
 {
     /// <summary>Basis-URL der Lizenz-API (v1).</summary>
-    public const string BaseUrl = "https://daonware.de/openclean/api/v1";
+    public const string BaseUrl = "https://daonware.de/oc-api/v1";
 
     /// <summary>Kaufseite (wird im Browser geöffnet).</summary>
     public const string BuyUrl = "https://daonware.de/openclean/premium";

@@ -7,7 +7,7 @@
         xmlns:views="clr-namespace:OpenClean.Views"
         xmlns:loc="clr-namespace:OpenClean.Services.Localization"
         mc:Ignorable="d"
-        Title="OpenClean" Height="760" Width="1180"
+        Title="OpenClean" Icon="Resources/openclean.png" Height="760" Width="1180"
         MinHeight="620" MinWidth="980"
         Background="{DynamicResource BgBrush}"
         WindowStartupLocation="CenterScreen"
@@ -70,11 +70,10 @@
                 <!-- Brand -->
                 <StackPanel DockPanel.Dock="Top" Margin="22,26,20,20">
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentBrush}"
-                                VerticalAlignment="Center">
-                            <Path Data="M 0,6 L 4,10 L 12,0" Stroke="#FF10261F" StrokeThickness="2.4"
-                                  Stretch="Uniform" Margin="8" StrokeEndLineCap="Round" StrokeStartLineCap="Round" />
-                        </Border>
+                        <!-- App-Logo (Resources\openclean.png). -->
+                        <Image Source="Resources/openclean.png" Width="36" Height="36"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock Text="{Binding AppTitle}" FontSize="21" FontWeight="Bold"
                                    VerticalAlignment="Center" Margin="12,0,0,0" />
                     </StackPanel>
@@ -181,8 +180,9 @@
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 2 A10 10 0 1 0 12 22 A10 10 0 1 0 12 2 Z M12 6 L12 12 L17 15" />
                             <TextBlock Text="{loc:Loc nav.schedule}" Margin="14,0,0,0" VerticalAlignment="Center" />
-                            <!-- Schloss-Symbol, solange Premium nicht freigeschaltet ist -->
-                            <TextBlock Text="&#x1F512;" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"
+                            <!-- Schloss-Symbol (Segoe MDL2 Assets), solange Premium nicht freigeschaltet ist -->
+                            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                       Margin="8,0,0,0" VerticalAlignment="Center"
                                        Opacity="0.7" ToolTip="{loc:Loc premium.locked.title}"
                                        Visibility="{Binding IsScheduleUnlocked, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                         </StackPanel>

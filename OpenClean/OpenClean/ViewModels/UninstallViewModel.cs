@@ -54,6 +54,14 @@ public sealed class UninstallViewModel : ViewModelBase
             _ => !IsBusy && Leftovers.Any(l => l.IsSelected));
         IgnoreLeftoversCommand = new RelayCommand(_ => ClearLeftovers());
 
+        // Schloss-Badge am Batch-Button aktuell halten: nach Aktivierung/Widerruf neu bewerten.
+        PremiumService.Instance.Changed += (_, _) =>
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is null || dispatcher.CheckAccess()) OnPropertyChanged(nameof(IsBatchLocked));
+            else dispatcher.InvokeAsync(() => OnPropertyChanged(nameof(IsBatchLocked)));
+        };
+
         AppsView = CollectionViewSource.GetDefaultView(Apps);
         AppsView.Filter = FilterApp;
 
@@ -136,6 +144,13 @@ public sealed class UninstallViewModel : ViewModelBase
 
     public string SelectionSummary =>
         Loc.T("uninstall.selection.summary", SelectedCount, ByteFormatter.Format(TotalSelectedBytes));
+
+    /// <summary>
+    /// True, solange die Batch-Deinstallation nicht freigeschaltet ist (steuert das
+    /// Schloss-Badge am „Ausgewählte deinstallieren"-Button). Einzeldeinstallation ist frei.
+    /// </summary>
+    public bool IsBatchLocked =>
+        !PremiumService.Instance.HasFeature(PremiumContract.FeatureBatchUninstall);
 
     public bool HasLeftovers => Leftovers.Count > 0;
 
@@ -241,6 +256,11 @@ public sealed class UninstallViewModel : ViewModelBase
         var app = item.Model;
         bool ok = await _uninstaller.UninstallAsync(app, silent: false);
 
+        // Auf das tatsächliche Entfernen warten: viele Hersteller-Deinstaller (z. B.
+        // Inno Setup) starten sich neu und der ursprüngliche Prozess endet SOFORT –
+        // ohne dieses Warten stünde der Eintrag beim Neuladen noch in der Registry.
+        if (ok) await WaitUntilRemovedAsync(new[] { app }, TimeSpan.FromSeconds(90));
+
         // Reste des (versuchten) Deinstallats suchen.
         await ScanLeftoversAsync(new[] { app }, app.Name);
 
@@ -286,14 +306,22 @@ public sealed class UninstallViewModel : ViewModelBase
         ProgressPercent = 0;
 
         int done = 0;
+        var removedOk = new List<InstalledApp>();
         foreach (var app in selected)
         {
             StatusText = Loc.T("uninstall.status.uninstallingBatch", done + 1, selected.Count, app.Name);
             ProgressText = StatusText;
-            await _uninstaller.UninstallAsync(app, silent: true);
+            if (await _uninstaller.UninstallAsync(app, silent: true))
+                removedOk.Add(app);
             done++;
             ProgressPercent = done * 100.0 / selected.Count;
         }
+
+        // Auf das tatsächliche Entfernen warten (Deinstaller laufen oft asynchron weiter),
+        // sonst blieben die Einträge beim Neuladen noch stehen.
+        ProgressIsIndeterminate = true;
+        if (removedOk.Count > 0)
+            await WaitUntilRemovedAsync(removedOk, TimeSpan.FromSeconds(120));
 
         // Reste aller entfernten Programme sammeln.
         await ScanLeftoversAsync(selected, Loc.T("uninstall.leftover.multiple", selected.Count));
@@ -301,6 +329,32 @@ public sealed class UninstallViewModel : ViewModelBase
         ProgressText = "";
         await LoadAsync();
         StatusText = Loc.T("uninstall.status.doneBatch", selected.Count);
+    }
+
+    /// <summary>
+    /// Wartet (bis <paramref name="maxWait"/>) darauf, dass die genannten Programme aus der
+    /// Registry verschwinden. Hersteller-Deinstaller arbeiten häufig asynchron weiter,
+    /// nachdem der gestartete Prozess bereits beendet ist (Neustart-in-Temp-Muster) – ohne
+    /// dieses Warten würde die Liste die eben entfernten Einträge noch anzeigen. Bricht
+    /// sofort ab, sobald alle weg sind; ein verbleibender Eintrag (z. B. abgebrochene
+    /// Deinstallation) läuft in den Timeout und bleibt danach korrekt in der Liste.
+    /// </summary>
+    private async Task WaitUntilRemovedAsync(IReadOnlyList<InstalledApp> apps, TimeSpan maxWait)
+    {
+        var ids = apps
+            .Select(a => (a.Name.ToLowerInvariant(), a.Version.ToLowerInvariant()))
+            .ToHashSet();
+
+        var deadline = DateTime.UtcNow + maxWait;
+        while (DateTime.UtcNow < deadline)
+        {
+            bool anyStillInstalled = await Task.Run(() =>
+                _inventory.GetInstalledApps().Any(a =>
+                    ids.Contains((a.Name.ToLowerInvariant(), a.Version.ToLowerInvariant()))));
+
+            if (!anyStillInstalled) return;
+            await Task.Delay(1000);
+        }
     }
 
     // ---- Reste --------------------------------------------------------------

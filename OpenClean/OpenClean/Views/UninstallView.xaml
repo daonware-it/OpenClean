@@ -121,9 +121,18 @@
                 </StackPanel>
                 <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
                         VerticalAlignment="Center" Command="{Binding RefreshCommand}" />
-                <Button Content="{loc:Loc uninstall.action.uninstallSelected}" Style="{StaticResource PrimaryButton}"
+                <Button Style="{StaticResource PrimaryButton}"
                         VerticalAlignment="Center" Margin="12,0,0,0"
-                        Command="{Binding UninstallSelectedCommand}" />
+                        Command="{Binding UninstallSelectedCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{loc:Loc uninstall.action.uninstallSelected}" VerticalAlignment="Center" />
+                        <!-- Schloss-Symbol (Segoe MDL2 Assets), solange die Batch-Deinstallation nicht freigeschaltet ist -->
+                        <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                   Margin="8,0,0,0" VerticalAlignment="Center"
+                                   ToolTip="{loc:Loc premium.batch.locked}"
+                                   Visibility="{Binding IsBatchLocked, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 
