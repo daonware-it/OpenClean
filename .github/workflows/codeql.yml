@@ -42,7 +42,7 @@ jobs:
     # CodeQL initialisieren. C# ist kompiliert -> manueller Build unten,
     # damit die Analyse zuverlässig den gesamten Code erfasst.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: csharp
         build-mode: manual
@@ -54,6 +54,6 @@ jobs:
         dotnet build OpenClean/OpenClean.sln --configuration Release --no-restore
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:csharp"
