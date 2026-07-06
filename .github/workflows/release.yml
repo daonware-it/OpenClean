@@ -1,0 +1,170 @@
+name: Release
+
+# Baut bei einem Versions-Tag (v*) die Portable-Version (self-contained Single-File)
+# als .zip sowie einen Inno-Setup-Installer (.exe) und hängt beide an ein GitHub-Release.
+# Manuell auslösbar (workflow_dispatch) zum Testen ohne Tag.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # nötig, um das Release zu erstellen und Assets hochzuladen
+
+# --- Azure Trusted Signing (Code-Signierung) -------------------------------
+# Nicht-geheime Konto-Werte zentral hier; die Zugangsdaten des Service
+# Principals liegen als GitHub-Secrets (AZURE_TENANT_ID / AZURE_CLIENT_ID /
+# AZURE_CLIENT_SECRET). Fehlt eines der Secrets (z. B. bei einem Fork oder
+# Test-Lauf ohne Signier-Rechte), werden die Signier-Steps übersprungen.
+env:
+  SIGN_ENDPOINT: 'https://neu.codesigning.azure.net/'   # Region Nord Europe (neu)
+  SIGN_ACCOUNT: 'DaonWare'                              # Trusted-Signing-Konto-Name
+  SIGN_PROFILE: 'OpenClean'                             # Certificate-Profile-Name (Public Trust)
+
+jobs:
+  release:
+    # WPF / net10.0-windows erfordert einen Windows-Runner (EnableWindowsTargeting
+    # erlaubt nur Restore/Analyse auf Linux, nicht den eigentlichen Build).
+    runs-on: windows-latest
+
+    # Die App liegt im Unterordner OpenClean/ des Repos. Alle `run`-Schritte laufen
+    # daher aus diesem Ordner, sodass die Projektpfade (OpenClean/OpenClean.csproj,
+    # installer\, publish\) relativ dazu stimmen. ACHTUNG: `working-directory` gilt NUR
+    # für `run`-Schritte – `uses`-Schritte (Signierung, Upload) nutzen weiter
+    # repo-root-relative Pfade (mit OpenClean\-Präfix bzw. ${{ github.workspace }}).
+    defaults:
+      run:
+        working-directory: OpenClean
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: .NET 10 einrichten
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Version aus dem Tag ableiten (v1.0.0 -> 1.0.0). Bei manuellem Lauf
+      # ohne Tag Fallback auf die csproj-Version 1.0.0.
+      - name: Version bestimmen
+        id: version
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref_name }}"
+          if ($ref -match '^v(\d+\.\d+\.\d+.*)$') {
+            $version = $Matches[1]
+          } else {
+            $version = '1.0.0'
+          }
+          Write-Host "Version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore
+        run: dotnet restore OpenClean/OpenClean.csproj
+
+      - name: Portable veröffentlichen (self-contained Single-File)
+        run: >
+          dotnet publish OpenClean/OpenClean.csproj
+          -p:PublishProfile=Portable
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish/portable
+
+      # Prüfen, ob die Signier-Secrets vorhanden sind. Nur dann werden die
+      # Signier-Steps ausgeführt (Forks/Test-Läufe ohne Secrets brechen nicht ab).
+      - name: Signier-Voraussetzungen prüfen
+        id: signcheck
+        shell: pwsh
+        run: |
+          $ok = -not [string]::IsNullOrEmpty($env:AZ_CLIENT_ID) `
+                -and -not [string]::IsNullOrEmpty($env:AZ_CLIENT_SECRET) `
+                -and -not [string]::IsNullOrEmpty($env:AZ_TENANT_ID)
+          Write-Host "Signierung aktiv: $ok"
+          "enabled=$($ok.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        env:
+          AZ_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZ_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZ_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      # Die self-contained Single-File-EXE signieren, BEVOR daraus der Installer
+      # gebaut und das Portable-.zip gepackt wird -> beide enthalten die signierte EXE.
+      - name: Portable-EXE signieren (Azure Trusted Signing)
+        if: steps.signcheck.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v0.5.9
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ env.SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ env.SIGN_PROFILE }}
+          files-folder: ${{ github.workspace }}\OpenClean\publish\portable
+          files-folder-filter: OpenClean.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Installer aus dem Publish-Verzeichnis bauen, BEVOR der Portable-Marker
+      # gesetzt wird -> installierte App nutzt %AppData% (kein Portable-Modus).
+      - name: Inno Setup installieren
+        run: choco install innosetup --no-progress -y
+
+      - name: Installer bauen
+        run: >
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          /DAppVersion=${{ steps.version.outputs.version }}
+          /DSourceDir=..\publish\portable
+          installer\OpenClean.iss
+        shell: pwsh
+
+      # Den fertigen Installer selbst signieren (der Installer ist eine eigene .exe
+      # und wird von SmartScreen unabhängig von der enthaltenen App bewertet).
+      - name: Installer signieren (Azure Trusted Signing)
+        if: steps.signcheck.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v0.5.9
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ env.SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ env.SIGN_PROFILE }}
+          files-folder: ${{ github.workspace }}\OpenClean\installer\Output
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Portable-Marker setzen und Portable-.zip packen (mit Marker -> Portable-Modus).
+      - name: Portable-ZIP packen
+        shell: pwsh
+        run: |
+          $out = "publish/portable"
+          Set-Content -Path "$out/OpenClean.portable" -Value "Diese Datei aktiviert den Portable-Modus von OpenClean. Nicht loeschen." -Encoding UTF8
+          $zip = "OpenClean-Portable-${{ steps.version.outputs.version }}.zip"
+          if (Test-Path $zip) { Remove-Item $zip }
+          Compress-Archive -Path "$out/*" -DestinationPath $zip
+          Write-Host "Erzeugt: $zip"
+
+      - name: Artefakte hochladen (Build-Log)
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclean-${{ steps.version.outputs.version }}
+          path: |
+            OpenClean/OpenClean-Portable-${{ steps.version.outputs.version }}.zip
+            OpenClean/installer/Output/OpenClean-Setup-${{ steps.version.outputs.version }}.exe
+          if-no-files-found: error
+
+      - name: GitHub-Release veröffentlichen
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OpenClean ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            OpenClean/OpenClean-Portable-${{ steps.version.outputs.version }}.zip
+            OpenClean/installer/Output/OpenClean-Setup-${{ steps.version.outputs.version }}.exe

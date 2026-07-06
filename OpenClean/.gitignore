@@ -1,0 +1,136 @@
+# .gitignore for OpenClean (.NET 10 / WPF)
+# Based on the official GitHub VisualStudio.gitignore, trimmed for a .NET desktop app.
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Build / MSBuild artifacts
+*.tlog
+*.log
+*.binlog
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+## Publish output
+publish/
+[Pp]ublish/
+*.[Pp]ublish.xml
+*.azurePubxml
+*.pubxml
+*.publishproj
+PublishScripts/
+# Ausnahme: das versionierte Portable-Publish-Profil (v0.11.0) muss eingecheckt bleiben.
+!OpenClean/Properties/PublishProfiles/Portable.pubxml
+
+## Installer output (Inno Setup)
+installer/Output/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+TestResults/
+[Cc]overage*/
+
+## Others
+*.cache
+ClientBin/
+~$*
+*~
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+StyleCopReport.xml
+
+## Rider / JetBrains — keep the shared, already-tracked .idea project files,
+## but ignore volatile per-user/machine files.
+.idea/**/workspace.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries/
+.idea/**/shelf/
+.idea/**/tasks.xml
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/httpRequests/
+.idea/**/*.iml
+.idea/**/modules.xml
+.idea/**/.name
+.idea_modules/
+
+## Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## OS files
+[Tt]humbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+## OpenClean — lokale/benutzerspezifische Laufzeitdaten
+# Die Laufzeit-Einstellungen liegen in %AppData%\OpenClean\settings.json (außerhalb des
+# Repos). Falls dennoch eine lokale settings-Datei im Projektbaum landet, nicht committen.
+settings.local.json
+**/settings.local.json

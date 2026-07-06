@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <!-- ImplicitUsings deaktiviert; globale Usings stehen explizit in
+             GlobalUsings.cs, damit JetBrains Rider sie zuverlässig auflöst. -->
+        <ImplicitUsings>disable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <!-- Erlaubt Restore/Analyse des Windows-Ziels auch auf Linux-Runnern
+             (GitHub Automatic Dependency Submission, Dependabot). Beeinflusst
+             den eigentlichen Windows-Build nicht. Behebt NETSDK1100. -->
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <!-- EXE-/Taskleisten-Icon (aus Resources\openclean.ico). -->
+        <ApplicationIcon>Resources\openclean.ico</ApplicationIcon>
+        <AssemblyTitle>OpenClean</AssemblyTitle>
+        <Product>OpenClean</Product>
+        <Version>1.0.0</Version>
+        <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
+        <NeutralLanguage>de</NeutralLanguage>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Sprachdateien: je eine JSON-Datei pro Sprache, als eingebettete Ressource
+             (logischer Name OpenClean.Resources.Strings.<code>.json). -->
+        <EmbeddedResource Include="Resources\Strings\*.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- App-Logo als WPF-Ressource für das Fenster-/Taskleisten-Icon (Window.Icon). -->
+        <Resource Include="Resources\openclean.png" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Plugin-Vertrag für das Premium-Modul (OpenClean.Premium.dll, Closed Source,
+             wird nach Lizenz-Aktivierung von daonware.de geladen). -->
+        <ProjectReference Include="..\OpenClean.Contracts\OpenClean.Contracts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- SQLite-Zugriff für Browser-Datenbanken (Verlauf, Cookies) -->
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+        <!-- Native SQLite-Binärdatei auf den gepatchten Build heben; behebt
+             GHSA-2m69-gcr7-jv3q (SQLitePCLRaw.lib.e_sqlite3 <= 2.1.11 ist
+             verwundbar). Der verwaltete Stack (core/provider) bleibt bei der von
+             Microsoft.Data.Sqlite validierten 2.1.x-Linie; die native Lib ist
+             ABI-stabil und daher unabhängig aktualisierbar. -->
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    </ItemGroup>
+
+</Project>
