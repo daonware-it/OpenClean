@@ -31,7 +31,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     # .NET 10 SDK für den manuellen Build (Ziel-Framework: net10.0-windows)
     - name: Install .NET
