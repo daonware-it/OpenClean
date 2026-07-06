@@ -12,7 +12,7 @@ aus – ausschließlich zu `daonware.de`:
 | Wann | Was wird übertragen |
 |---|---|
 | Lizenz aktivieren (manuell im Dialog) | Lizenzschlüssel, anonymer Geräte-Hash*, App-Version |
-| Token-Erneuerung (nur wenn eine Lizenz existiert, das Token älter als 7 Tage ist **und** der Premium-Bereich geöffnet wird – nie beim App-Start) | Lizenzschlüssel, anonymer Geräte-Hash*, App-Version |
+| Lizenzprüfung beim Start und beim geplanten Reinigungslauf (**nur wenn bereits eine Lizenz vorhanden ist** – erneuert das Token und erkennt einen serverseitigen Widerruf; Free-Nutzer lösen dies nie aus) | Lizenzschlüssel, anonymer Geräte-Hash*, App-Version |
 | Gerät deaktivieren (manuell) | Lizenzschlüssel, anonymer Geräte-Hash* |
 | Premium-Modul-Download (nach Aktivierung) | kurzlebiger Download-Token, App-Version |
 
@@ -31,7 +31,11 @@ Keine Konten, keine Passwörter, keine Nutzungs- oder Systemdaten.
 ## Offline-Nutzung
 
 Die Lizenz wird lokal über eine signierte Datei (`license.json`) geprüft und
-funktioniert **30 Tage vollständig offline**; danach genügt eine kurze
-Token-Erneuerung bei geöffnetem Premium-Bereich. Die Zahlungsabwicklung erfolgt
-über Stripe (siehe deren Datenschutzerklärung); OpenClean selbst erhält davon nur
-E-Mail-Adresse und Bestellreferenz.
+funktioniert **bis zu 30 Tage vollständig offline**. Besteht eine Internet-
+verbindung, prüft die App die Lizenz beim Start kurz gegen den Server (Token-
+Erneuerung; ein widerrufener Schlüssel wird dabei erkannt und lokal entfernt).
+Ohne Internet läuft Premium weiter, bis der letzte erfolgreiche Server-Kontakt
+30 Tage zurückliegt; danach ist einmalig eine Online-Prüfung erforderlich.
+
+Die Zahlungsabwicklung erfolgt über Stripe (siehe deren Datenschutzerklärung);
+OpenClean selbst erhält davon nur E-Mail-Adresse und Bestellreferenz.

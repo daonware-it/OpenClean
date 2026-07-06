@@ -121,8 +121,8 @@ public sealed class PremiumService
 
     /// <summary>
     /// Erneuert das Token im Hintergrund, wenn es älter als eine Woche ist. Wird beim
-    /// Öffnen des Premium-Bereichs aufgerufen – nie beim App-Start, nie blockierend
-    /// (Privacy-Prinzip: die App kontaktiert daonware.de nur, wenn eine Lizenz existiert).
+    /// Öffnen des Premium-Bereichs aufgerufen – nie blockierend.
+    /// (Privacy-Prinzip: die App kontaktiert daonware.de nur, wenn eine Lizenz existiert.)
     /// </summary>
     public void RefreshInBackground()
     {
@@ -131,9 +131,73 @@ public sealed class PremiumService
 
         _ = Task.Run(async () =>
         {
-            try { await TryFetchModuleAsync(); }
+            try { await EnforceLicenseOnlineAsync(); }
             catch { /* Hintergrund-Refresh darf nie stören. */ }
         });
+    }
+
+    /// <summary>
+    /// Startet die Online-Lizenzprüfung im Hintergrund (nicht blockierend). Sicher schon
+    /// beim App-Start aufrufbar: OHNE vorhandene Lizenz passiert NICHTS – es wird also
+    /// kein Netzwerkzugriff für Free-Nutzer ausgelöst (Privacy-Prinzip bleibt gewahrt).
+    /// </summary>
+    public void EnforceLicenseInBackground()
+    {
+        if (string.IsNullOrWhiteSpace(LicenseService.Instance.LicenseKey)) return;
+
+        _ = Task.Run(async () =>
+        {
+            try { await EnforceLicenseOnlineAsync(); }
+            catch { /* Der Start darf nie an der Lizenzprüfung hängen. */ }
+        });
+    }
+
+    /// <summary>
+    /// Prüft die vorhandene Lizenz gegen den Server und setzt das Ergebnis durch:
+    /// <list type="bullet">
+    ///   <item>Server bestätigt → Token wird erneuert (frische 30-Tage-Offline-Frist),
+    ///   fehlendes/veraltetes Modul wird nachgeladen.</item>
+    ///   <item>Server LEHNT den Schlüssel ab (gelöscht/widerrufen → <see cref="LicenseApiError.InvalidKey"/>)
+    ///   → Lizenz wird lokal ENTFERNT, Premium sofort gesperrt.</item>
+    ///   <item>Nur Netzwerkfehler (offline, Server nicht erreichbar) → Lizenz bleibt
+    ///   unverändert; die 30-Tage-Offline-Frist entscheidet dann lokal.</item>
+    /// </list>
+    /// Liefert true, wenn ein Server-Kontakt zustande kam (bestätigt ODER abgelehnt);
+    /// false bei reinem Netzwerkfehler oder ohne Lizenz.
+    /// </summary>
+    public async Task<bool> EnforceLicenseOnlineAsync()
+    {
+        string? key = LicenseService.Instance.LicenseKey;
+        if (string.IsNullOrWhiteSpace(key)) return false;
+
+        var api = new LicenseApiClient();
+        var result = await api.ValidateAsync(key);
+
+        if (result.Success && result.PayloadBase64 is not null && result.SignatureBase64 is not null)
+        {
+            // Modul NUR nachladen, wenn es lokal fehlt – sonst würde jeder Start das
+            // Modul unnötig neu herunterladen. Ein vorhandenes, aber inkompatibles Modul
+            // (Hash-Mismatch nach App-Update) repariert der Nutzer über den Locked-Bereich.
+            if (!File.Exists(ModulePath) && !string.IsNullOrEmpty(result.DownloadToken))
+            {
+                byte[]? bytes = await api.DownloadModuleAsync(result.DownloadToken);
+                if (bytes is { Length: > 0 })
+                    TrySaveModule(bytes);
+            }
+
+            LicenseService.Instance.TrySaveToken(key, result.PayloadBase64, result.SignatureBase64);
+            return true;
+        }
+
+        // Eindeutige Ablehnung durch den Server = Schlüssel existiert nicht mehr / widerrufen.
+        // Nur DANN lokal entfernen – ein transienter Netzwerkfehler darf NIE die Lizenz löschen.
+        if (result.Error == LicenseApiError.InvalidKey)
+        {
+            LicenseService.Instance.RemoveLicense();
+            return true;
+        }
+
+        return false; // Network/DeviceLimit → Offline-Zustand belassen.
     }
 
     /// <summary>Speichert heruntergeladene Modul-Bytes an den festen Modulpfad.</summary>

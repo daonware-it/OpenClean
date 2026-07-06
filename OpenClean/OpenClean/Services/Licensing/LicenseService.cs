@@ -59,6 +59,15 @@ public sealed class LicenseService
     private const string PublicKeySpkiBase64 =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZrbF8dm0h71FSJtZSReDN5uvcXwIRsOMQExFRnxlHbqeB9pOhwHDUUQzY9/52WQisXck2eCUrEbR3i/f+TQ9rg==";
 
+    /// <summary>
+    /// Maximale Zeitspanne, die eine Lizenz OHNE erfolgreichen Server-Kontakt gültig bleibt.
+    /// <see cref="LicensePayload.IssuedUtc"/> markiert den letzten Online-Kontakt (das Token
+    /// wird nur bei Aktivierung/Refresh serverseitig neu signiert). Nach Ablauf dieser Frist
+    /// gilt die Lizenz als <see cref="LicenseState.Expired"/> und erfordert eine
+    /// Online-Prüfung – unabhängig davon, welche <c>exp</c> der Server ins Token schrieb.
+    /// </summary>
+    public static readonly TimeSpan OfflineGrace = TimeSpan.FromDays(30);
+
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>Prozessweiter Singleton.</summary>
@@ -189,7 +198,13 @@ public sealed class LicenseService
     {
         _payload = payload;
         _licenseKey = licenseKey;
-        _state = payload.ExpiresUtc > DateTime.UtcNow ? LicenseState.Valid : LicenseState.Expired;
+
+        // Gültig nur, solange WEDER die Server-Frist (exp) NOCH die 30-Tage-Offline-Frist
+        // (letzter Online-Kontakt = iat) überschritten ist. Die kürzere der beiden zählt –
+        // so greift die 30-Tage-Grenze auch dann, wenn der Server ein längeres Token ausstellt.
+        var offlineDeadline = payload.IssuedUtc + OfflineGrace;
+        var effectiveExpiry = payload.ExpiresUtc < offlineDeadline ? payload.ExpiresUtc : offlineDeadline;
+        _state = effectiveExpiry > DateTime.UtcNow ? LicenseState.Valid : LicenseState.Expired;
     }
 
     /// <summary>

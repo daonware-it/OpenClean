@@ -1,16 +1,17 @@
-; Inno-Setup-Skript für OpenClean (v0.11.0).
+; Inno-Setup-Skript für OpenClean (v1.0.0).
 ; Baut einen klassischen Installer aus dem self-contained Publish-Verzeichnis.
 ; Die installierte App enthält KEINE OpenClean.portable-Marker-Datei und nutzt
 ; daher %AppData%\OpenClean für ihre Einstellungen (Portable-Modus nur beim .zip).
 ;
 ; Aufruf (siehe .github\workflows\release.yml):
-;   ISCC.exe /DAppVersion=0.11.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
+;   ISCC.exe /DAppVersion=1.0.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
 ;
-; Hinweis: Der Installer ist (noch) unsigniert -> Windows SmartScreen kann warnen.
-; Code-Signierung ist für v0.12.0 vorgesehen.
+; Signierung: Der fertige Installer wird in der Release-Pipeline per Azure
+; Trusted Signing signiert (siehe .github\workflows\release.yml). AppPublisher
+; muss exakt dem bei der Org-Validierung eingetragenen Firmennamen entsprechen.
 
 #ifndef AppVersion
-  #define AppVersion "0.11.0"
+  #define AppVersion "1.0.0"
 #endif
 
 #ifndef SourceDir
@@ -19,7 +20,8 @@
 #endif
 
 #define AppName "OpenClean"
-#define AppPublisher "OpenClean"
+; Firmenname aus dem Trusted-Signing-Zertifikat (Subject O=DaonWare).
+#define AppPublisher "DaonWare"
 #define AppExeName "OpenClean.exe"
 #define AppUrl "https://github.com/daonware-it/OpenClean"
 
@@ -41,6 +43,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
 OutputDir=Output
 OutputBaseFilename=OpenClean-Setup-{#AppVersion}
+; Icon des Setup-Programms (App-Logo). Pfad relativ zu dieser .iss (installer\).
+SetupIconFile=..\OpenClean\Resources\openclean.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

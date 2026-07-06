@@ -13,6 +13,16 @@ on:
 permissions:
   contents: write   # nötig, um das Release zu erstellen und Assets hochzuladen
 
+# --- Azure Trusted Signing (Code-Signierung) -------------------------------
+# Nicht-geheime Konto-Werte zentral hier; die Zugangsdaten des Service
+# Principals liegen als GitHub-Secrets (AZURE_TENANT_ID / AZURE_CLIENT_ID /
+# AZURE_CLIENT_SECRET). Fehlt eines der Secrets (z. B. bei einem Fork oder
+# Test-Lauf ohne Signier-Rechte), werden die Signier-Steps übersprungen.
+env:
+  SIGN_ENDPOINT: 'https://neu.codesigning.azure.net/'   # Region Nord Europe (neu)
+  SIGN_ACCOUNT: 'DaonWare'                              # Trusted-Signing-Konto-Name
+  SIGN_PROFILE: 'OpenClean'                             # Certificate-Profile-Name (Public Trust)
+
 jobs:
   release:
     # WPF / net10.0-windows erfordert einen Windows-Runner (EnableWindowsTargeting
@@ -28,8 +38,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Version aus dem Tag ableiten (v0.11.0 -> 0.11.0). Bei manuellem Lauf
-      # ohne Tag Fallback auf die csproj-Version 0.11.0.
+      # Version aus dem Tag ableiten (v1.0.0 -> 1.0.0). Bei manuellem Lauf
+      # ohne Tag Fallback auf die csproj-Version 1.0.0.
       - name: Version bestimmen
         id: version
         shell: pwsh
@@ -38,7 +48,7 @@ jobs:
           if ($ref -match '^v(\d+\.\d+\.\d+.*)$') {
             $version = $Matches[1]
           } else {
-            $version = '0.11.0'
+            $version = '1.0.0'
           }
           Write-Host "Version: $version"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -53,6 +63,40 @@ jobs:
           -p:Version=${{ steps.version.outputs.version }}
           -o publish/portable
 
+      # Prüfen, ob die Signier-Secrets vorhanden sind. Nur dann werden die
+      # Signier-Steps ausgeführt (Forks/Test-Läufe ohne Secrets brechen nicht ab).
+      - name: Signier-Voraussetzungen prüfen
+        id: signcheck
+        shell: pwsh
+        run: |
+          $ok = -not [string]::IsNullOrEmpty($env:AZ_CLIENT_ID) `
+                -and -not [string]::IsNullOrEmpty($env:AZ_CLIENT_SECRET) `
+                -and -not [string]::IsNullOrEmpty($env:AZ_TENANT_ID)
+          Write-Host "Signierung aktiv: $ok"
+          "enabled=$($ok.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        env:
+          AZ_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZ_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZ_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      # Die self-contained Single-File-EXE signieren, BEVOR daraus der Installer
+      # gebaut und das Portable-.zip gepackt wird -> beide enthalten die signierte EXE.
+      - name: Portable-EXE signieren (Azure Trusted Signing)
+        if: steps.signcheck.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v0.5.9
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ env.SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ env.SIGN_PROFILE }}
+          files-folder: ${{ github.workspace }}\publish\portable
+          files-folder-filter: OpenClean.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       # Installer aus dem Publish-Verzeichnis bauen, BEVOR der Portable-Marker
       # gesetzt wird -> installierte App nutzt %AppData% (kein Portable-Modus).
       - name: Inno Setup installieren
@@ -65,6 +109,24 @@ jobs:
           /DSourceDir=..\publish\portable
           installer\OpenClean.iss
         shell: pwsh
+
+      # Den fertigen Installer selbst signieren (der Installer ist eine eigene .exe
+      # und wird von SmartScreen unabhängig von der enthaltenen App bewertet).
+      - name: Installer signieren (Azure Trusted Signing)
+        if: steps.signcheck.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v0.5.9
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.SIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ env.SIGN_ACCOUNT }}
+          certificate-profile-name: ${{ env.SIGN_PROFILE }}
+          files-folder: ${{ github.workspace }}\installer\Output
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       # Portable-Marker setzen und Portable-.zip packen (mit Marker -> Portable-Modus).
       - name: Portable-ZIP packen

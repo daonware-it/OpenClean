@@ -44,6 +44,11 @@ public partial class App : Application
         var window = new MainWindow();
         MainWindow = window;
         window.Show();
+
+        // Online-Lizenzprüfung im Hintergrund anstoßen: erneuert das Token (frische
+        // 30-Tage-Offline-Frist) bzw. entfernt eine serverseitig widerrufene Lizenz.
+        // Ohne vorhandene Lizenz passiert nichts -> Free-Nutzer lösen KEIN Netzwerk aus.
+        PremiumService.Instance.EnforceLicenseInBackground();
     }
 
     /// <summary>True, wenn ein Argument dem Auto-Schalter entspricht (case-insensitiv, auch /auto).</summary>
@@ -63,6 +68,13 @@ public partial class App : Application
         {
             var settings = SettingsService.Instance.Current;
             var schedule = settings.Schedule;
+
+            // Online-Lizenzprüfung auch im unbeaufsichtigten Lauf: erkennt einen serverseitigen
+            // Widerruf, bevor ohne gültige Lizenz gereinigt wird, und erneuert die Offline-Frist.
+            // Blockierend (durch das HTTP-Timeout des Clients begrenzt) und nur bei vorhandener
+            // Lizenz aktiv; ein Netzwerkfehler bricht den Lauf nicht ab (dann greift die 30-Tage-Frist).
+            try { PremiumService.Instance.EnforceLicenseOnlineAsync().GetAwaiter().GetResult(); }
+            catch { /* Netzwerk-/Serverfehler dürfen den geplanten Lauf nie verhindern. */ }
 
             // Premium-Prüfung (rein offline über das signierte Lizenz-Token): ohne Lizenz
             // und ohne Grandfathering wird NICHT gereinigt – aber nie stillschweigend:

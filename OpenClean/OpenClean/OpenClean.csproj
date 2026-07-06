@@ -13,9 +13,11 @@
              den eigentlichen Windows-Build nicht. Behebt NETSDK1100. -->
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <!-- EXE-/Taskleisten-Icon (aus Resources\openclean.ico). -->
+        <ApplicationIcon>Resources\openclean.ico</ApplicationIcon>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
-        <Version>0.12.0</Version>
+        <Version>1.0.0</Version>
         <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
         <NeutralLanguage>de</NeutralLanguage>
     </PropertyGroup>
@@ -24,6 +26,11 @@
         <!-- Sprachdateien: je eine JSON-Datei pro Sprache, als eingebettete Ressource
              (logischer Name OpenClean.Resources.Strings.<code>.json). -->
         <EmbeddedResource Include="Resources\Strings\*.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- App-Logo als WPF-Ressource für das Fenster-/Taskleisten-Icon (Window.Icon). -->
+        <Resource Include="Resources\openclean.png" />
     </ItemGroup>
 
     <ItemGroup>
