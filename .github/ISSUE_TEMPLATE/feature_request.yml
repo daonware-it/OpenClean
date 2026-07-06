@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea for OpenClean
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or pain point.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like OpenClean to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Other approaches you thought about.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Alignment with OpenClean's principles
+      options:
+        - label: This does not require telemetry, tracking, or fake results.
+          required: true

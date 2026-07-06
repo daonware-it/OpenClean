@@ -1,0 +1,12 @@
+OpenClean — open-core licensing notice
+=======================================
+
+OpenClean follows an open-core model.
+
+The MIT License in the LICENSE file covers the application source contained in
+this repository.
+
+The optional "OpenClean Premium" module (OpenClean.Premium.dll), delivered
+separately after license activation, is a proprietary component and is NOT
+covered by the MIT License. All rights to the Premium module are reserved by
+DaonWare.
