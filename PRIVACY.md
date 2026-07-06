@@ -1,41 +1,41 @@
-# Datenschutz in OpenClean
+# Privacy in OpenClean
 
-OpenClean sammelt **keine Telemetrie**, benötigt **kein Konto** und läuft ohne
-Hintergrunddienst. Die App nimmt im normalen Betrieb **keinerlei Netzwerkverbindung**
-auf.
+OpenClean collects **no telemetry**, requires **no account**, and runs without a
+background service. During normal operation the app makes **no network connection
+whatsoever**.
 
-## Die einzige Ausnahme: Premium-Lizenz (optional)
+## The only exception: Premium license (optional)
 
-Wer OpenClean Premium kauft und aktiviert, löst die einzigen Netzwerkzugriffe der App
-aus – ausschließlich zu `daonware.de`:
+Buying and activating OpenClean Premium triggers the app's only network requests —
+exclusively to `daonware.de`:
 
-| Wann | Was wird übertragen |
+| When | What is transmitted |
 |---|---|
-| Lizenz aktivieren (manuell im Dialog) | Lizenzschlüssel, anonymer Geräte-Hash*, App-Version |
-| Lizenzprüfung beim Start und beim geplanten Reinigungslauf (**nur wenn bereits eine Lizenz vorhanden ist** – erneuert das Token und erkennt einen serverseitigen Widerruf; Free-Nutzer lösen dies nie aus) | Lizenzschlüssel, anonymer Geräte-Hash*, App-Version |
-| Gerät deaktivieren (manuell) | Lizenzschlüssel, anonymer Geräte-Hash* |
-| Premium-Modul-Download (nach Aktivierung) | kurzlebiger Download-Token, App-Version |
+| Activate license (manual, in the dialog) | License key, anonymous device hash*, app version |
+| License check on startup and on the scheduled cleanup run (**only if a license is already present** – renews the token and detects a server-side revocation; free users never trigger this) | License key, anonymous device hash*, app version |
+| Deactivate device (manual) | License key, anonymous device hash* |
+| Premium module download (after activation) | short-lived download token, app version |
 
-\* Der Geräte-Hash ist ein SHA-256-Hash der Windows-MachineGuid mit App-Präfix.
-Er lässt sich nicht auf den Rechner oder die Person zurückrechnen; es wird nie eine
-Roh-Kennung übertragen. Er dient allein der Begrenzung „Lizenz auf max. 3 Geräten“.
+\* The device hash is a SHA-256 hash of the Windows MachineGuid with an app prefix.
+It cannot be reversed back to the machine or the person, and no raw identifier is ever
+transmitted. It serves solely to enforce the "license on max. 3 devices" limit.
 
-## Was der Lizenzserver speichert
+## What the license server stores
 
-- E-Mail-Adresse (aus dem Kauf – für Schlüsselversand und Support)
-- SHA-256-Hash des Lizenzschlüssels (nie der Schlüssel selbst)
-- Geräte-Hashes und Zeitstempel der Aktivierungen
+- E-mail address (from the purchase – for key delivery and support)
+- SHA-256 hash of the license key (never the key itself)
+- Device hashes and timestamps of activations
 
-Keine Konten, keine Passwörter, keine Nutzungs- oder Systemdaten.
+No accounts, no passwords, no usage or system data.
 
-## Offline-Nutzung
+## Offline use
 
-Die Lizenz wird lokal über eine signierte Datei (`license.json`) geprüft und
-funktioniert **bis zu 30 Tage vollständig offline**. Besteht eine Internet-
-verbindung, prüft die App die Lizenz beim Start kurz gegen den Server (Token-
-Erneuerung; ein widerrufener Schlüssel wird dabei erkannt und lokal entfernt).
-Ohne Internet läuft Premium weiter, bis der letzte erfolgreiche Server-Kontakt
-30 Tage zurückliegt; danach ist einmalig eine Online-Prüfung erforderlich.
+The license is verified locally via a signed file (`license.json`) and works
+**fully offline for up to 30 days**. When an internet connection is available, the app
+briefly validates the license against the server on startup (token renewal; a revoked
+key is detected and removed locally). Without internet, Premium keeps working until the
+last successful server contact is 30 days old; after that, a single online check is
+required.
 
-Die Zahlungsabwicklung erfolgt über Stripe (siehe deren Datenschutzerklärung);
-OpenClean selbst erhält davon nur E-Mail-Adresse und Bestellreferenz.
+Payment is handled by Stripe (see their privacy policy); OpenClean itself only receives
+the e-mail address and order reference.
