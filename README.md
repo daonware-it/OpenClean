@@ -26,7 +26,7 @@ and **no telemetry**. Every number you see is a real measurement.
 - 🧹 **Cleanup** — preview temp files and caches (Windows, thumbnails, browsers, …) before anything is deleted. **You decide** what gets removed.
 - ⭐ **Startup** — see and manage autostart entries and their impact on boot time.
 - 🛡️ **Privacy** — find and clear privacy-relevant traces.
-- ⬆️ **Updates** — check for new OpenClean versions.
+- ⬆️ **Updates** — check for new System versions.
 - 🗑️ **Uninstall** — list installed programs by size and remove them, including a scan for leftover folders and registry remnants. **Single uninstall is always free.**
 - 📑 **Duplicate finder** — find exact duplicates by SHA-256 and safely remove redundant copies.
 
