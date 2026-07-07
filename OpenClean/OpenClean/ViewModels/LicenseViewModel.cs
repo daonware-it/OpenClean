@@ -84,6 +84,7 @@ public sealed class LicenseViewModel : ViewModelBase
         {
             LicenseApiError.InvalidKey => Loc.T("premium.error.invalidKey"),
             LicenseApiError.DeviceLimit => Loc.T("premium.error.deviceLimit"),
+            LicenseApiError.RateLimited => Loc.T("premium.error.rateLimited"),
             _ => Loc.T("premium.error.network")
         };
     }

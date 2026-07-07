@@ -117,18 +117,22 @@ public sealed class TempScannerService
 
         if (def.Kind == CleanupKind.RecycleBin)
         {
-            progress?.Report(new ScanProgress { CurrentPath = Loc.T("cleanup.recycleBin.progress"), Done = done, Total = total });
-            long size = RecycleBin.GetSize();
-            if (size > 0)
+            // Tatsächlichen Inhalt auflisten: je Papierkorb-Objekt ein Item mit Originalpfad
+            // (Anzeige) und den echten $R/$I-Löschzielen.
+            foreach (var entry in RecycleBin.Enumerate())
             {
+                progress?.Report(new ScanProgress { CurrentPath = entry.OriginalPath, Done = done, Total = total });
                 results.Add(new ScanItem
                 {
-                    FullPath = Loc.T("cleanup.recycleBin.itemPath"),
-                    SizeBytes = size,
-                    IsDirectory = true
+                    FullPath = entry.OriginalPath,
+                    SizeBytes = entry.Size,
+                    IsDirectory = entry.IsDirectory,
+                    RecycleDataPath = entry.DataPath,
+                    RecycleMetaPath = entry.MetaPath
                 });
+                done++;
             }
-            done++;
+            progress?.Report(new ScanProgress { CurrentPath = Loc.T("cleanup.recycleBin.progress"), Done = done, Total = total });
             return results;
         }
 
@@ -142,7 +146,8 @@ public sealed class TempScannerService
                 done++;
                 progress?.Report(new ScanProgress { CurrentPath = root.Path, Done = done, Total = total });
                 long selfSize = DirectorySize(root.Path);
-                if ((selfSize > 0 || IsEmptyReclaimable(root.Path)) && seen.Add(root.Path))
+                if ((selfSize > 0 || IsEmptyReclaimable(root.Path))
+                    && !CleanerService.IsProtectedFromCleaning(root.Path) && seen.Add(root.Path))
                     results.Add(new ScanItem { FullPath = root.Path, SizeBytes = selfSize, IsDirectory = true });
                 continue;
             }
@@ -159,7 +164,8 @@ public sealed class TempScannerService
                     done++;
                     progress?.Report(new ScanProgress { CurrentPath = f, Done = done, Total = total });
                     var item = TryMakeFileItem(f);
-                    if (item is not null && seen.Add(item.FullPath))
+                    if (item is not null && !CleanerService.IsProtectedFromCleaning(item.FullPath)
+                        && seen.Add(item.FullPath))
                         results.Add(item);
                 }
                 continue;
@@ -188,7 +194,8 @@ public sealed class TempScannerService
                     item = TryMakeFileItem(entry);
                 }
 
-                if (item is not null && seen.Add(item.FullPath))
+                if (item is not null && !CleanerService.IsProtectedFromCleaning(item.FullPath)
+                    && seen.Add(item.FullPath))
                     results.Add(item);
             }
         }
@@ -204,7 +211,7 @@ public sealed class TempScannerService
     {
         var def = Definitions.FirstOrDefault(d => d.Key == category.Key);
         if (def is null) return 0;
-        if (def.Kind == CleanupKind.RecycleBin) return 1;
+        if (def.Kind == CleanupKind.RecycleBin) return Math.Max(1, RecycleBin.Enumerate().Count);
 
         int count = 0;
         foreach (var root in def.RootProvider())

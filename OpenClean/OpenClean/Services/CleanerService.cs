@@ -78,17 +78,45 @@ public sealed class CleanerService
 
     private static void CleanRecycleBin(CleanupReport report, CleanupCategory category)
     {
-        long size = category.Items.Where(i => i.IsSelected).Sum(i => i.SizeBytes);
-        try
+        var selected = category.Items.Where(i => i.IsSelected).ToList();
+        if (selected.Count == 0) return;
+
+        // Sind ALLE aufgelisteten Objekte ausgewählt, den offiziellen, schnellen Weg nehmen
+        // (leert den Papierkorb komplett über die Shell).
+        bool allSelected = selected.Count == category.Items.Count;
+        if (allSelected)
         {
-            RecycleBin.Empty();
-            report.DeletedCount++;
-            report.FreedBytes += size;
-            report.Deleted.Add(Loc.T("cleanup.recycleBin.itemPath"));
+            try
+            {
+                RecycleBin.Empty();
+                foreach (var item in selected)
+                {
+                    report.DeletedCount++;
+                    report.FreedBytes += item.SizeBytes;
+                    report.Deleted.Add(item.FullPath);
+                }
+                return;
+            }
+            catch
+            {
+                // Zeitüberschreitung/Fehler -> unten einzeln versuchen.
+            }
         }
-        catch
+
+        // Teilauswahl (oder komplettes Leeren fehlgeschlagen): jedes ausgewählte Objekt
+        // einzeln über seine $R-/$I-Dateien entfernen.
+        foreach (var item in selected)
         {
-            report.Skipped.Add(Loc.T("cleanup.recycleBin.name"));
+            if (RecycleBin.DeleteEntry(item.RecycleDataPath, item.RecycleMetaPath))
+            {
+                report.DeletedCount++;
+                report.FreedBytes += item.SizeBytes;
+                report.Deleted.Add(item.FullPath);
+            }
+            else
+            {
+                report.Skipped.Add(item.FullPath);
+            }
         }
     }
 
@@ -153,6 +181,60 @@ public sealed class CleanerService
                 return false;
         }
 
+        // Entpackordner von Single-File-.NET-Apps niemals löschen.
+        if (IsProtectedFromCleaning(full)) return false;
+
         return true;
+    }
+
+    /// <summary>
+    /// True, wenn der Pfad zum Selbst-Entpackordner von Single-File-.NET-Apps gehört
+    /// (<c>%TEMP%\.net</c> bzw. <c>DOTNET_BUNDLE_EXTRACT_BASE_DIR</c>) – gleich diesem
+    /// Ordner oder darunter. Dorthin entpackt OpenClean beim Start seine native
+    /// <c>e_sqlite3.dll</c>; würde der unbeaufsichtigte Lauf diesen Ordner (er liegt in
+    /// <c>%TEMP%</c>, also im Reinigungsziel) löschen, brächte er sich mitten im Lauf
+    /// selbst zum Absturz. Der Ausschluss schützt zugleich die laufenden Entpackordner
+    /// anderer Single-File-Apps – ein Cleaner darf die nie anrühren.
+    /// </summary>
+    internal static bool IsProtectedFromCleaning(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+
+        string full;
+        try { full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar); }
+        catch { return false; }
+
+        foreach (var extractBase in NetBundleExtractBases())
+        {
+            if (full.Equals(extractBase, StringComparison.OrdinalIgnoreCase)) return true;
+            // Echtes Nachfahren-Verhältnis (Grenze am Trennzeichen, kein reiner StartsWith:
+            // sonst würde "...\.network" fälschlich auf "...\.net" matchen).
+            if (full.StartsWith(extractBase + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Kandidaten für die .NET-Bundle-Entpackwurzel (normalisiert, ohne End-Trennzeichen).</summary>
+    private static IEnumerable<string> NetBundleExtractBases()
+    {
+        var bases = new List<string>();
+
+        void Add(string? dir)
+        {
+            if (string.IsNullOrWhiteSpace(dir)) return;
+            try { bases.Add(Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar)); }
+            catch { /* ungültiger Pfad -> ignorieren */ }
+        }
+
+        // Nutzerdefinierte Wurzel (falls gesetzt) hat Vorrang; darunter erzeugt der Host
+        // je App/Version einen Unterordner – geschützt wird die gesamte Wurzel.
+        Add(Environment.GetEnvironmentVariable("DOTNET_BUNDLE_EXTRACT_BASE_DIR"));
+        // Standard unter Windows: %TEMP%\.net
+        try { Add(Path.Combine(Path.GetTempPath(), ".net")); }
+        catch { /* GetTempPath sollte nie werfen -> defensiv */ }
+
+        return bases;
     }
 }

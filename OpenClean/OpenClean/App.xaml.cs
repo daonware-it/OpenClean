@@ -73,7 +73,13 @@ public partial class App : Application
             // Widerruf, bevor ohne gültige Lizenz gereinigt wird, und erneuert die Offline-Frist.
             // Blockierend (durch das HTTP-Timeout des Clients begrenzt) und nur bei vorhandener
             // Lizenz aktiv; ein Netzwerkfehler bricht den Lauf nicht ab (dann greift die 30-Tage-Frist).
-            try { PremiumService.Instance.EnforceLicenseOnlineAsync().GetAwaiter().GetResult(); }
+            // WICHTIG: über Task.Run auf einen Hintergrund-Thread legen. Ein direktes
+            // GetAwaiter().GetResult() auf dem UI-Thread in OnStartup führt zum Deadlock –
+            // die await-Fortsetzung des HTTP-Aufrufs will zurück auf den UI-Thread, dessen
+            // Dispatcher-Schleife im --auto-Modus aber noch nicht pumpt (der Lauf blockiert
+            // dann unbegrenzt, das HTTP-Timeout greift nicht). Auf dem Threadpool gibt es
+            // keinen UI-SynchronizationContext -> die Fortsetzung läuft frei weiter.
+            try { Task.Run(() => PremiumService.Instance.EnforceLicenseOnlineAsync()).GetAwaiter().GetResult(); }
             catch { /* Netzwerk-/Serverfehler dürfen den geplanten Lauf nie verhindern. */ }
 
             // Premium-Prüfung (rein offline über das signierte Lizenz-Token): ohne Lizenz

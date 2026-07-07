@@ -21,6 +21,8 @@ public enum LicenseApiError
     InvalidKey,
     /// <summary>Geräte-Limit der Lizenz erreicht.</summary>
     DeviceLimit,
+    /// <summary>Zu viele Anfragen in kurzer Zeit – der Server drosselt (HTTP 429).</summary>
+    RateLimited,
     /// <summary>Server nicht erreichbar / Zeitüberschreitung / unerwartete Antwort.</summary>
     Network
 }
@@ -126,6 +128,9 @@ public sealed class LicenseApiClient
     private static LicenseApiError MapError(HttpStatusCode status, string? error) => status switch
     {
         HttpStatusCode.Conflict => LicenseApiError.DeviceLimit,
+        // 429: Ratenbegrenzung – NICHT als „nicht erreichbar" melden, sonst denkt der
+        // Nutzer, sein Internet sei defekt, obwohl er nur kurz warten muss.
+        HttpStatusCode.TooManyRequests => LicenseApiError.RateLimited,
         HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.BadRequest
             => error == "device_limit" ? LicenseApiError.DeviceLimit : LicenseApiError.InvalidKey,
         _ => LicenseApiError.Network

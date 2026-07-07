@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.IO;
+using System.Text;
 using OpenClean.Models;
 
 namespace OpenClean.Services;
@@ -31,40 +33,111 @@ public sealed class ScheduleTaskService
     /// <summary>
     /// Legt die geplante Aufgabe anhand der Einstellungen an (überschreibt eine
     /// vorhandene). Gibt true bei Erfolg zurück.
+    ///
+    /// Registriert über eine XML-Definition (<c>schtasks /Create /XML</c>) statt über
+    /// Einzel-Flags, da nur so die für Laptops entscheidenden Einstellungen setzbar sind:
+    /// auch im Akkubetrieb starten und einen verpassten Lauf (PC aus/Standby) nachholen.
     /// </summary>
     public bool Register(ScheduleSettings schedule)
     {
         string? exe = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(exe)) return false;
 
-        var args = new List<string>
+        string xml = BuildTaskXml(schedule, exe);
+
+        // schtasks /XML erwartet die Datei in UTF-16 (mit BOM); die XML-Deklaration
+        // nennt entsprechend UTF-16.
+        string tempFile = Path.Combine(Path.GetTempPath(), $"openclean-task-{Guid.NewGuid():N}.xml");
+        try
         {
-            "/Create",
-            "/TN", TaskName,
-            // Anführungszeichen um den EXE-Pfad, damit Leerzeichen im Pfad korrekt sind.
-            "/TR", $"\"{exe}\" {AutoSwitch}",
-            "/RL", "HIGHEST",
-            "/F",
-            "/ST", $"{Clamp(schedule.Hour, 0, 23):D2}:{Clamp(schedule.Minute, 0, 59):D2}"
+            File.WriteAllText(tempFile, xml, new UnicodeEncoding(bigEndian: false, byteOrderMark: true));
+            var (exit, _) = RunSchtasks(new[] { "/Create", "/TN", TaskName, "/XML", tempFile, "/F" });
+            return exit == 0;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); }
+            catch { /* Aufräumen ist optional. */ }
+        }
+    }
+
+    /// <summary>
+    /// Baut die Aufgabenplaner-XML (Schema 1.2) für den gewünschten Zeitplan: Trigger je
+    /// nach Frequenz, höchste Rechte, Start auch im Akkubetrieb und Nachholen verpasster Läufe.
+    /// </summary>
+    private static string BuildTaskXml(ScheduleSettings schedule, string exe)
+    {
+        int hour = Clamp(schedule.Hour, 0, 23);
+        int minute = Clamp(schedule.Minute, 0, 59);
+        // Task Scheduler verlangt ein StartBoundary-Datum; das konkrete Datum ist bei
+        // einem wiederkehrenden Kalender-Trigger unerheblich – nur die Uhrzeit zählt.
+        string startBoundary = $"2020-01-01T{hour:D2}:{minute:D2}:00";
+        string user = X($"{Environment.UserDomainName}\\{Environment.UserName}");
+        string command = X(exe);
+
+        string trigger = schedule.Frequency switch
+        {
+            "Daily" =>
+                $"      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>",
+            "Monthly" =>
+                "      <ScheduleByMonth>" +
+                $"<DaysOfMonth><Day>{Clamp(schedule.DayOfMonth, 1, 28)}</Day></DaysOfMonth>" +
+                "<Months><January/><February/><March/><April/><May/><June/><July/>" +
+                "<August/><September/><October/><November/><December/></Months>" +
+                "</ScheduleByMonth>",
+            _ => // "Weekly"
+                "      <ScheduleByWeek><WeeksInterval>1</WeeksInterval>" +
+                $"<DaysOfWeek><{WeekdayElement(schedule.DayOfWeek)}/></DaysOfWeek>" +
+                "</ScheduleByWeek>"
         };
 
-        switch (schedule.Frequency)
-        {
-            case "Daily":
-                args.Add("/SC"); args.Add("DAILY");
-                break;
-            case "Monthly":
-                args.Add("/SC"); args.Add("MONTHLY");
-                args.Add("/D"); args.Add(Clamp(schedule.DayOfMonth, 1, 28).ToString());
-                break;
-            default: // "Weekly"
-                args.Add("/SC"); args.Add("WEEKLY");
-                args.Add("/D"); args.Add(WeekdayCode(schedule.DayOfWeek));
-                break;
-        }
-
-        var (exit, _) = RunSchtasks(args);
-        return exit == 0;
+        return
+$@"<?xml version=""1.0"" encoding=""UTF-16""?>
+<Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
+  <RegistrationInfo>
+    <Author>OpenClean</Author>
+    <Description>{X("Automatische Reinigung durch OpenClean.")}</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>{startBoundary}</StartBoundary>
+      <Enabled>true</Enabled>
+{trigger}
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id=""Author"">
+      <UserId>{user}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context=""Author"">
+    <Exec>
+      <Command>{command}</Command>
+      <Arguments>{AutoSwitch}</Arguments>
+    </Exec>
+  </Actions>
+</Task>";
     }
 
     /// <summary>Entfernt die geplante Aufgabe. True, wenn sie danach nicht mehr existiert.</summary>
@@ -81,16 +154,20 @@ public sealed class ScheduleTaskService
 
     // ---- Hilfsfunktionen ----------------------------------------------------
 
-    private static string WeekdayCode(int dayOfWeek) => (dayOfWeek % 7) switch
+    /// <summary>Wochentag als Task-Scheduler-XML-Elementname (z. B. <c>Monday</c>).</summary>
+    private static string WeekdayElement(int dayOfWeek) => (dayOfWeek % 7) switch
     {
-        0 => "SUN",
-        1 => "MON",
-        2 => "TUE",
-        3 => "WED",
-        4 => "THU",
-        5 => "FRI",
-        _ => "SAT"
+        0 => "Sunday",
+        1 => "Monday",
+        2 => "Tuesday",
+        3 => "Wednesday",
+        4 => "Thursday",
+        5 => "Friday",
+        _ => "Saturday"
     };
+
+    /// <summary>XML-escaped einen Textwert (Pfade, Benutzernamen) für die Task-Definition.</summary>
+    private static string X(string value) => System.Security.SecurityElement.Escape(value) ?? value;
 
     private static int Clamp(int value, int min, int max)
         => value < min ? min : value > max ? max : value;

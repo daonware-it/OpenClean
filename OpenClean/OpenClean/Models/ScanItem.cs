@@ -14,6 +14,15 @@ public sealed class ScanItem : ViewModelBase
     public required long SizeBytes { get; init; }
     public bool IsDirectory { get; init; }
 
+    /// <summary>
+    /// Nur für Papierkorb-Einträge gesetzt: die tatsächlichen Löschziele in
+    /// <c>$Recycle.Bin</c> (<c>$R</c>-Daten- und <c>$I</c>-Metadatei). <see cref="FullPath"/>
+    /// zeigt bei diesen Einträgen den Originalpfad (für die Anzeige), gelöscht werden aber
+    /// diese beiden Dateien.
+    /// </summary>
+    public string? RecycleDataPath { get; init; }
+    public string? RecycleMetaPath { get; init; }
+
     /// <summary>Ob dieses Item beim Bereinigen gelöscht wird.</summary>
     public bool IsSelected
     {

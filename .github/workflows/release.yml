@@ -57,7 +57,7 @@ jobs:
           if ($ref -match '^v(\d+\.\d+\.\d+.*)$') {
             $version = $Matches[1]
           } else {
-            $version = '1.0.0'
+            $version = '1.0.1'
           }
           Write-Host "Version: $version"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append

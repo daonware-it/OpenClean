@@ -8,6 +8,9 @@
              GlobalUsings.cs, damit JetBrains Rider sie zuverlässig auflöst. -->
         <ImplicitUsings>disable</ImplicitUsings>
         <UseWPF>true</UseWPF>
+        <!-- WinForms nur für die zuverlässige Windows-Benachrichtigung (NotifyIcon-Ballon)
+             nach der automatischen Reinigung – funktioniert auch für die unpackaged App. -->
+        <UseWindowsForms>true</UseWindowsForms>
         <!-- Erlaubt Restore/Analyse des Windows-Ziels auch auf Linux-Runnern
              (GitHub Automatic Dependency Submission, Dependabot). Beeinflusst
              den eigentlichen Windows-Build nicht. Behebt NETSDK1100. -->
@@ -17,7 +20,7 @@
         <ApplicationIcon>Resources\openclean.ico</ApplicationIcon>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
-        <Version>1.0.0</Version>
+        <Version>1.0.1</Version>
         <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
         <NeutralLanguage>de</NeutralLanguage>
     </PropertyGroup>

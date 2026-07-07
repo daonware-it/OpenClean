@@ -1,3 +1,7 @@
 
 ## Privates Premium-Repo darf NIE im oeffentlichen Repo landen (liegt ausserhalb, Absicherung)
 openclean-premium/
+
+## IDE (JetBrains Rider) und lokale Test-Builds
+.idea/
+test-build/
