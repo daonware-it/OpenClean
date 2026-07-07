@@ -157,11 +157,40 @@ jobs:
             OpenClean/installer/Output/OpenClean-Setup-${{ steps.version.outputs.version }}.exe
           if-no-files-found: error
 
+      # Release-Beschreibung aus dem passenden CHANGELOG.md-Abschnitt ziehen.
+      # working-directory ist OpenClean/, die CHANGELOG.md liegt im Repo-Root (../).
+      # Ergebnis nach ../RELEASE_NOTES.md (= Repo-Root), damit der uses-Schritt unten
+      # es repo-root-relativ als body_path referenzieren kann.
+      - name: Release-Notes aus CHANGELOG extrahieren
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $changelog = Get-Content -Raw ../CHANGELOG.md
+          # Abschnitt "## [version] ..." bis zum nächsten "## [" (oder Dateiende).
+          $pattern = "(?ms)^##\s*\[" + [regex]::Escape($version) + "\].*?(?=^##\s*\[|\Z)"
+          $match = [regex]::Match($changelog, $pattern)
+          if ($match.Success) {
+            # Erste Zeile (## [x] - Datum) entfernen, Rest ist der Body.
+            $body = ($match.Value.Trim() -split "`n", 2)[1].Trim()
+            # Referenz-Link-Definitionen (z. B. "[1.0.0]: https://...") entfernen –
+            # die werden nur beim jeweils letzten Abschnitt mit erfasst.
+            $body = (($body -split "`n") | Where-Object { $_ -notmatch '^\[[^\]]+\]:\s*https?://' }) -join "`n"
+            $body = $body.Trim()
+          } else {
+            $body = "Release $version. Siehe CHANGELOG.md."
+            Write-Host "::warning::Kein CHANGELOG-Abschnitt fuer $version gefunden."
+          }
+          $body += "`n`n**Full changelog:** https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md"
+          Set-Content -Path ../RELEASE_NOTES.md -Value $body -Encoding utf8
+          Write-Host "----- Release notes -----"; Write-Host $body
+
       - name: GitHub-Release veröffentlichen
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: OpenClean ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
