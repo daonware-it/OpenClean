@@ -28,6 +28,7 @@ public sealed class UninstallViewModel : ViewModelBase
     private string _statusText = Loc.T("uninstall.status.loading");
     private string _searchText = "";
     private UninstallSort _sort = UninstallSort.Groesse;
+    private bool _sizeDescending = true;
     private double _progressPercent;
     private bool _progressIsIndeterminate = true;
     private string _progressText = "";
@@ -44,6 +45,8 @@ public sealed class UninstallViewModel : ViewModelBase
     public AsyncRelayCommand UninstallSelectedCommand { get; }
     public AsyncRelayCommand RemoveLeftoversCommand { get; }
     public RelayCommand IgnoreLeftoversCommand { get; }
+    public RelayCommand SortBySizeCommand { get; }
+    public RelayCommand SortByNameCommand { get; }
 
     public UninstallViewModel()
     {
@@ -53,6 +56,14 @@ public sealed class UninstallViewModel : ViewModelBase
         RemoveLeftoversCommand = new AsyncRelayCommand(_ => RemoveLeftoversAsync(),
             _ => !IsBusy && Leftovers.Any(l => l.IsSelected));
         IgnoreLeftoversCommand = new RelayCommand(_ => ClearLeftovers());
+        // Klick auf „Größe": schaltet zwischen ab-/aufsteigend um, wenn schon aktiv;
+        // sonst wird auf Größensortierung gewechselt (Richtung bleibt erhalten).
+        SortBySizeCommand = new RelayCommand(_ =>
+        {
+            if (_sort == UninstallSort.Groesse) SizeDescending = !SizeDescending;
+            else Sort = UninstallSort.Groesse;
+        });
+        SortByNameCommand = new RelayCommand(_ => Sort = UninstallSort.Name);
 
         // Schloss-Badge am Batch-Button aktuell halten: nach Aktivierung/Widerruf neu bewerten.
         PremiumService.Instance.Changed += (_, _) =>
@@ -114,12 +125,36 @@ public sealed class UninstallViewModel : ViewModelBase
     public UninstallSort Sort
     {
         get => _sort;
-        set
+        private set
         {
             if (SetProperty(ref _sort, value))
+            {
+                OnPropertyChanged(nameof(IsSortSize));
+                OnPropertyChanged(nameof(IsSortName));
                 ApplySort();
+            }
         }
     }
+
+    public bool IsSortSize => _sort == UninstallSort.Groesse;
+    public bool IsSortName => _sort == UninstallSort.Name;
+
+    /// <summary>Sortierrichtung bei „Größe": true = absteigend (größte zuerst).</summary>
+    public bool SizeDescending
+    {
+        get => _sizeDescending;
+        private set
+        {
+            if (SetProperty(ref _sizeDescending, value))
+            {
+                OnPropertyChanged(nameof(SizeArrow));
+                ApplySort();
+            }
+        }
+    }
+
+    /// <summary>Pfeil-Symbol für die aktuelle Größen-Sortierrichtung.</summary>
+    public string SizeArrow => _sizeDescending ? "▼" : "▲";
 
     public double ProgressPercent
     {
@@ -173,6 +208,7 @@ public sealed class UninstallViewModel : ViewModelBase
             Apps.Add(new UninstallItemViewModel(app, UninstallOneAsync, OnSelectionChanged));
 
         ApplySort();
+        UpdateSizeBars();
         IsBusy = false;
         RefreshSelection();
         StatusText = Apps.Count == 0
@@ -182,6 +218,38 @@ public sealed class UninstallViewModel : ViewModelBase
         // Fehlende Größen (z. B. Steam-Spiele ohne EstimatedSize) im Hintergrund aus dem
         // Installationsordner nachberechnen und live nachtragen.
         _ = ComputeMissingSizesAsync(generation);
+
+        // Programm-Icons im Hintergrund extrahieren und live nachtragen (Cache macht
+        // erneutes Laden sofort). Bis dahin zeigt die Zeile einen Buchstaben-Avatar.
+        _ = LoadIconsAsync(generation);
+    }
+
+    /// <summary>
+    /// Extrahiert die Programm-Icons parallel im Hintergrund (eingefroren, thread-sicher
+    /// übergebbar) und trägt sie per Dispatcher live nach. Bricht ab, sobald ein neuer
+    /// Ladevorgang startet.
+    /// </summary>
+    private async Task LoadIconsAsync(int generation)
+    {
+        var pending = Apps.Where(a => !string.IsNullOrWhiteSpace(a.IconPath)).ToList();
+        if (pending.Count == 0) return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        await Task.Run(() => Parallel.ForEach(pending,
+            new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            (item, state) =>
+            {
+                if (generation != _loadGeneration) { state.Stop(); return; }
+                var icon = AppIconService.GetIcon(item.IconPath);
+                if (icon is null || generation != _loadGeneration) return;
+
+                dispatcher?.InvokeAsync(() =>
+                {
+                    if (generation != _loadGeneration) return;
+                    item.SetIcon(icon);
+                });
+            }));
     }
 
     /// <summary>
@@ -213,6 +281,16 @@ public sealed class UninstallViewModel : ViewModelBase
                     RefreshSelection();
                 });
             }));
+
+        // Nach dem Nachberechnen den Größen-Balken-Bezug (größtes Programm) aktualisieren.
+        if (generation == _loadGeneration) UpdateSizeBars();
+    }
+
+    /// <summary>Setzt den Bezugswert für die Größen-Balken (größtes Programm) auf allen Zeilen.</summary>
+    private void UpdateSizeBars()
+    {
+        long max = Apps.Count > 0 ? Apps.Max(a => a.SizeBytes) : 1;
+        foreach (var a in Apps) a.SetMaxBytes(max);
     }
 
     private bool FilterApp(object item)
@@ -229,7 +307,7 @@ public sealed class UninstallViewModel : ViewModelBase
         AppsView.SortDescriptions.Clear();
         if (_sort == UninstallSort.Groesse)
             AppsView.SortDescriptions.Add(new SortDescription(nameof(UninstallItemViewModel.SizeBytes),
-                ListSortDirection.Descending));
+                _sizeDescending ? ListSortDirection.Descending : ListSortDirection.Ascending));
         // Name immer als sekundärer Schlüssel: stabile Reihenfolge bei gleicher Größe
         // (sonst „springen" Einträge ohne Größe bei jedem Live-Sort-Update).
         AppsView.SortDescriptions.Add(new SortDescription(nameof(UninstallItemViewModel.Name),

@@ -20,7 +20,7 @@
         <ApplicationIcon>Resources\openclean.ico</ApplicationIcon>
         <AssemblyTitle>OpenClean</AssemblyTitle>
         <Product>OpenClean</Product>
-        <Version>1.0.2</Version>
+        <Version>1.1.0</Version>
         <!-- Standardsprache der eingebetteten Ressourcen (Rückfall bei fehlenden Schlüsseln). -->
         <NeutralLanguage>de</NeutralLanguage>
     </PropertyGroup>
@@ -51,6 +51,10 @@
              Microsoft.Data.Sqlite validierten 2.1.x-Linie; die native Lib ist
              ABI-stabil und daher unabhängig aktualisierbar. -->
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="REF\" />
     </ItemGroup>
 
 </Project>

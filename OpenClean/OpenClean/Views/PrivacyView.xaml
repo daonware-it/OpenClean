@@ -25,10 +25,23 @@
                            Style="{StaticResource MutedText}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button Content="{loc:Loc common.analyze}" Style="{StaticResource SecondaryButton}"
-                        Command="{Binding ScanCommand}" />
-                <Button Content="{loc:Loc common.clean}" Style="{StaticResource PrimaryButton}"
-                        Command="{Binding CleanCommand}" Margin="12,0,0,0" />
+                <Button Style="{StaticResource SecondaryButton}" Command="{Binding ScanCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M11 5 a6 6 0 1 0 0 12 a6 6 0 1 0 0 -12 Z M20.5 20.5 L15.8 15.8" />
+                        <TextBlock Text="{loc:Loc common.analyze}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PrimaryButton}" Command="{Binding CleanCommand}" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z" />
+                        <TextBlock Text="{loc:Loc common.clean}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 
@@ -49,12 +62,15 @@
             </Border>
 
             <!-- Auswahl-Zusammenfassung -->
-            <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18">
+            <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <!-- Dezenter Akzent-Glow -->
+                    <Rectangle Grid.ColumnSpan="2" Margin="-22,-18" Fill="{DynamicResource HeroGlowBrush}"
+                               IsHitTestVisible="False" />
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="{loc:Loc privacy.selectedLabel}" Style="{StaticResource MutedText}"
                                    FontSize="11.5" FontWeight="SemiBold" />
@@ -109,11 +125,26 @@
                                         <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                   VerticalAlignment="Center" Margin="0,0,14,0"
                                                   ToolTip="{loc:Loc common.includeInAnalysis}" />
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding HeaderDisplay}" FontSize="14.5" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}"
-                                                       FontSize="11.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
+                                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <!-- Icon-Chip (Schild) -->
+                                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="12"
+                                                    Background="{DynamicResource AccentSoftBrush}"
+                                                    VerticalAlignment="Center" Margin="0,0,14,0">
+                                                <Path Width="20" Height="20" Stretch="Uniform"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Fill="{DynamicResource AccentBrush}"
+                                                      Data="M12 2 L20 5 V11 C20 16 16.5 20.3 12 22 C7.5 20.3 4 16 4 11 V5 Z M12 4.2 L6 6.4 V11 C6 15 8.6 18.5 12 19.9 C15.4 18.5 18 15 18 11 V6.4 Z" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding HeaderDisplay}" FontSize="14.5" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}"
+                                                           FontSize="11.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Grid>
                                         <!-- master select-all -->
                                         <CheckBox Grid.Column="2" IsChecked="{Binding AllSelected, Mode=TwoWay}"
                                                   IsThreeState="True" Content="{loc:Loc common.all}" VerticalAlignment="Center"
@@ -204,7 +235,7 @@
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
                 Margin="-32,14,-32,0" Padding="32,12">
             <StackPanel>
-                <ProgressBar IsIndeterminate="True" Height="6" Margin="0,0,0,8"
+                <ProgressBar Style="{StaticResource LoadingBar}" Margin="0,0,0,8"
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
                            FontSize="12.5" VerticalAlignment="Center" />

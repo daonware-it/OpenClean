@@ -20,6 +20,13 @@ public sealed class InstalledApp
     public string InstallLocation { get; init; } = "";
 
     /// <summary>
+    /// Pfad zur Datei, aus der das Programm-Icon extrahiert werden kann (aus DisplayIcon,
+    /// ohne Icon-Index; meist die Haupt-EXE oder eine .ico-Datei). Leer, wenn keine
+    /// brauchbare Quelle vorliegt – dann wird ein Buchstaben-Avatar angezeigt.
+    /// </summary>
+    public string IconPath { get; init; } = "";
+
+    /// <summary>
     /// Ordner, aus dem die Größe berechnet werden darf: InstallLocation oder – falls
     /// diese fehlt/unsicher ist – abgeleitet aus DisplayIcon bzw. Uninstaller-Pfad.
     /// NUR für die Größenberechnung; die Reste-Suche nutzt weiterhin InstallLocation,

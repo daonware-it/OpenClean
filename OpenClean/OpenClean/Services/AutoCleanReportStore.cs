@@ -13,9 +13,9 @@ namespace OpenClean.Services;
 /// </summary>
 public sealed class AutoCleanReportStore
 {
-    // Maximale Anzahl aufbewahrter Berichte und maximale Pfadanzahl je Bericht
+    // Standard-Anzahl aufbewahrter Berichte und maximale Pfadanzahl je Bericht
     // (deckelt die Dateigröße – bei tausenden gelöschten Dateien).
-    private const int MaxReports = 30;
+    private const int DefaultMaxReports = 30;
     private const int MaxPathsPerReport = 500;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -49,16 +49,18 @@ public sealed class AutoCleanReportStore
     }
 
     /// <summary>
-    /// Erzeugt aus einem Reinigungsergebnis einen Bericht, speichert ihn (vorne in der
-    /// Historie, gedeckelt auf <see cref="MaxReports"/>) und schreibt eine Protokollzeile.
-    /// Gibt den erzeugten Bericht zurück (z. B. für die Benachrichtigung).
+    /// Erzeugt aus einem Reinigungsergebnis einen Bericht und speichert ihn gemäß den
+    /// Zeitplan-Einstellungen: bei deaktiviertem <see cref="ScheduleSettings.SaveReports"/>
+    /// wird nichts persistiert, sonst vorne in die Historie eingefügt und auf
+    /// <see cref="ScheduleSettings.ReportRetention"/> Einträge gedeckelt (plus Protokollzeile).
+    /// Gibt den erzeugten Bericht immer zurück (z. B. für die Benachrichtigung).
     /// </summary>
-    public AutoCleanReport Add(string profile, CleanupReport result, DateTime timestamp)
+    public AutoCleanReport Add(ScheduleSettings schedule, CleanupReport result, DateTime timestamp)
     {
         var report = new AutoCleanReport
         {
             Timestamp = timestamp,
-            Profile = profile,
+            Profile = schedule.Profile,
             DeletedCount = result.DeletedCount,
             FreedBytes = result.FreedBytes,
             SkippedCount = result.Skipped.Count,
@@ -66,10 +68,17 @@ public sealed class AutoCleanReportStore
             PathsTruncated = result.Deleted.Count > MaxPathsPerReport
         };
 
-        SaveJson(report);
-        AppendLog(report);
+        if (schedule.SaveReports)
+        {
+            SaveJson(report, RetentionOf(schedule));
+            AppendLog(report);
+        }
         return report;
     }
+
+    /// <summary>Aufbewahrungsanzahl aus den Einstellungen, auf sinnvolle Grenzen geklemmt.</summary>
+    private static int RetentionOf(ScheduleSettings schedule)
+        => schedule.ReportRetention > 0 ? Math.Clamp(schedule.ReportRetention, 1, 1000) : DefaultMaxReports;
 
     /// <summary>
     /// Protokolliert einen ÜBERSPRUNGENEN geplanten Lauf (z. B. fehlende Premium-Lizenz)
@@ -89,15 +98,15 @@ public sealed class AutoCleanReportStore
         }
     }
 
-    private void SaveJson(AutoCleanReport report)
+    private void SaveJson(AutoCleanReport report, int maxReports)
     {
         try
         {
             EnsureDir(JsonPath);
             var history = new List<AutoCleanReport>(Load());
             history.Insert(0, report);
-            if (history.Count > MaxReports)
-                history.RemoveRange(MaxReports, history.Count - MaxReports);
+            if (history.Count > maxReports)
+                history.RemoveRange(maxReports, history.Count - maxReports);
             File.WriteAllText(JsonPath, JsonSerializer.Serialize(history, JsonOptions));
         }
         catch

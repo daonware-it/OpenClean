@@ -68,6 +68,12 @@ public sealed class ScheduleSettings
 
     /// <summary>Ob nach einer automatischen Reinigung eine Windows-Benachrichtigung erscheinen soll.</summary>
     public bool Notify { get; set; } = true;
+
+    /// <summary>Ob nach automatischen Läufen Berichte gespeichert werden (JSON-Historie + Textprotokoll).</summary>
+    public bool SaveReports { get; set; } = true;
+
+    /// <summary>Wie viele Berichte in der Historie aufbewahrt werden (z. B. 10/30/100).</summary>
+    public int ReportRetention { get; set; } = 30;
 }
 
 /// <summary>

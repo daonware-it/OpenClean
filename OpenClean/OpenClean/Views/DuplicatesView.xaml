@@ -30,13 +30,35 @@
                            TextTrimming="CharacterEllipsis" ToolTip="{loc:Loc duplicates.subtitle}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button Content="{loc:Loc duplicates.action.addFolder}" Style="{StaticResource SecondaryButton}"
-                        Command="{Binding AddFolderCommand}" />
-                <Button Content="{loc:Loc duplicates.action.cancel}" Style="{StaticResource SecondaryButton}"
+                <Button Style="{StaticResource SecondaryButton}" Command="{Binding AddFolderCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Data="M2 4 L8 4 L10 6 L20 6 L20 18 L2 18 Z M10 9 H12 V11 H14 V13 H12 V15 H10 V13 H8 V11 H10 Z" />
+                        <TextBlock Text="{loc:Loc duplicates.action.addFolder}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource SecondaryButton}"
                         Margin="12,0,0,0" Command="{Binding CancelCommand}"
-                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
-                <Button Content="{loc:Loc duplicates.action.scan}" Style="{StaticResource PrimaryButton}"
-                        Margin="12,0,0,0" Command="{Binding ScanCommand}" />
+                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M4 4 L20 20 M20 4 L4 20" />
+                        <TextBlock Text="{loc:Loc duplicates.action.cancel}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PrimaryButton}"
+                        Margin="12,0,0,0" Command="{Binding ScanCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M11 5 a6 6 0 1 0 0 12 a6 6 0 1 0 0 -12 Z M20.5 20.5 L15.8 15.8" />
+                        <TextBlock Text="{loc:Loc duplicates.action.scan}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 
@@ -100,8 +122,15 @@
                         Padding="12,6" FontSize="12" Margin="8,0,0,0"
                         Command="{Binding ClearSelectionCommand}" />
             </StackPanel>
-            <Button Grid.Column="1" Content="{loc:Loc duplicates.action.delete}" Style="{StaticResource PrimaryButton}"
-                    Padding="16,8" Command="{Binding DeleteSelectedCommand}" />
+            <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
+                    Padding="16,8" Command="{Binding DeleteSelectedCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z" />
+                    <TextBlock Text="{loc:Loc duplicates.action.delete}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
         </Grid>
 
         <!-- ===== Gruppen (links) + Vergleich nebeneinander (rechts) ===== -->
@@ -170,8 +199,9 @@
                                                    FontSize="11.5" Margin="0,2,0,0" />
                                     </StackPanel>
                                     <Border Grid.Column="1" CornerRadius="6" Padding="7,2" VerticalAlignment="Center"
-                                            Background="{DynamicResource SurfaceBrush}">
+                                            Background="{DynamicResource AccentSoftBrush}">
                                         <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                   FontFamily="{StaticResource MonoFont}"
                                                    Foreground="{DynamicResource AccentBrush}">
                                             <Run Text="{Binding SelectedCount, Mode=OneWay}" /><Run Text=" ✓" />
                                         </TextBlock>
@@ -275,7 +305,7 @@
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
                 Margin="-32,14,-32,0" Padding="32,12">
             <StackPanel>
-                <ProgressBar IsIndeterminate="True" Height="6" Margin="0,0,0,8"
+                <ProgressBar Style="{StaticResource LoadingBar}" Margin="0,0,0,8"
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
                 <Grid>
                     <Grid.ColumnDefinitions>

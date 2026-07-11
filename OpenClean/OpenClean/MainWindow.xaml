@@ -128,7 +128,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                  Data="M4 4 H20 V11 H4 Z M4 13 H20 V20 H4 Z M7 7.5 H7.01 M7 16.5 H7.01" />
+                                  Data="M3 5 H21 V11 H3 Z M3 13 H21 V19 H3 Z M18 8 m -0.9 0 a 0.9 0.9 0 1 0 1.8 0 a 0.9 0.9 0 1 0 -1.8 0 M18 16 m -0.9 0 a 0.9 0.9 0 1 0 1.8 0 a 0.9 0.9 0 1 0 -1.8 0" />
                             <TextBlock Text="{loc:Loc nav.storage}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
@@ -148,7 +148,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                  Data="M12 3 L14 9 L20 9 L15 13 L17 20 L12 16 L7 20 L9 13 L4 9 L10 9 Z" />
+                                  Data="M12 2 C14.5 4.5 16 8.5 16 13 L8 13 C8 8.5 9.5 4.5 12 2 Z M8 11.5 L5 15 L5.5 17.5 L8 15.8 Z M16 11.5 L19 15 L18.5 17.5 L16 15.8 Z M10 16 L12 21 L14 16 Z M12 7 m -1.6 0 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0" />
                             <TextBlock Text="{loc:Loc nav.startup}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>

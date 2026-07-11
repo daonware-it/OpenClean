@@ -236,6 +236,16 @@ public sealed class PremiumService
     {
         try
         {
+#if DEBUG
+            // Dev-Override (nur Debug-Builds): eine neben der EXE liegende Modul-DLL wird
+            // OHNE Hash-Prüfung bevorzugt geladen. Das Premium-Repo kopiert sie per
+            // Post-Build dorthin – sonst ließe sich ein lokaler Modul-Build mit echter
+            // Lizenz nie testen (Token-Hash lehnt ihn ab, der Hintergrund-Refresh
+            // überschreibt ihn wieder mit dem Server-Modul).
+            string devPath = Path.Combine(AppContext.BaseDirectory, PremiumContract.ModuleFileName);
+            if (File.Exists(devPath))
+                return LoadFrom(devPath, license);
+#endif
             if (!File.Exists(ModulePath)) return null;
 
             // Integritätsprüfung gegen den signierten Hash aus dem Lizenz-Token
@@ -249,23 +259,29 @@ public sealed class PremiumService
                     return null;
             }
 
-            var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(ModulePath);
-
-            var moduleType = assembly.GetTypes().FirstOrDefault(t =>
-                typeof(IPremiumModule).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass);
-            if (moduleType is null) return null;
-
-            if (Activator.CreateInstance(moduleType) is not IPremiumModule module) return null;
-            if (module.ContractVersion != PremiumContract.Version) return null;
-
-            module.Initialize(new Host(license));
-            return module;
+            return LoadFrom(ModulePath, license);
         }
         catch
         {
             // Beschädigte/inkompatible DLL -> Free-Zustand, nie ein Crash.
             return null;
         }
+    }
+
+    /// <summary>Lädt das Modul-Assembly, prüft die Contract-Version und initialisiert es.</summary>
+    private static IPremiumModule? LoadFrom(string path, LicenseInfo license)
+    {
+        var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+
+        var moduleType = assembly.GetTypes().FirstOrDefault(t =>
+            typeof(IPremiumModule).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass);
+        if (moduleType is null) return null;
+
+        if (Activator.CreateInstance(moduleType) is not IPremiumModule module) return null;
+        if (module.ContractVersion != PremiumContract.Version) return null;
+
+        module.Initialize(new Host(license));
+        return module;
     }
 
     private sealed class Host : IPremiumHost

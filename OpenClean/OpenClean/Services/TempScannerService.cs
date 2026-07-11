@@ -14,7 +14,7 @@ public sealed class TempScannerService
     /// SelfAsItem == true => der Ordner SELBST wird ein Item (mit rekursiver Gesamtgröße),
     /// nicht seine Kinder (für gezielt erkannte Cache-Ordner).
     /// </summary>
-    private sealed record Root(string Path, string? Pattern, bool SelfAsItem = false);
+    private sealed record Root(string Path, string? Pattern, bool SelfAsItem = false, string? SubKey = null);
 
     // Key = Basis-Lokalisierungsschlüssel der Kategorie (z. B. "cat.windowsTemp");
     // der Anzeigename kommt aus "<Key>.name", die Beschreibung aus "<Key>.description".
@@ -148,7 +148,7 @@ public sealed class TempScannerService
                 long selfSize = DirectorySize(root.Path);
                 if ((selfSize > 0 || IsEmptyReclaimable(root.Path))
                     && !CleanerService.IsProtectedFromCleaning(root.Path) && seen.Add(root.Path))
-                    results.Add(new ScanItem { FullPath = root.Path, SizeBytes = selfSize, IsDirectory = true });
+                    results.Add(new ScanItem { FullPath = root.Path, SizeBytes = selfSize, IsDirectory = true, SubKey = root.SubKey });
                 continue;
             }
 
@@ -163,7 +163,7 @@ public sealed class TempScannerService
                 {
                     done++;
                     progress?.Report(new ScanProgress { CurrentPath = f, Done = done, Total = total });
-                    var item = TryMakeFileItem(f);
+                    var item = TryMakeFileItem(f, root.SubKey);
                     if (item is not null && !CleanerService.IsProtectedFromCleaning(item.FullPath)
                         && seen.Add(item.FullPath))
                         results.Add(item);
@@ -186,12 +186,12 @@ public sealed class TempScannerService
                 {
                     long size = DirectorySize(entry);
                     item = size > 0 || IsEmptyReclaimable(entry)
-                        ? new ScanItem { FullPath = entry, SizeBytes = size, IsDirectory = true }
+                        ? new ScanItem { FullPath = entry, SizeBytes = size, IsDirectory = true, SubKey = root.SubKey }
                         : null;
                 }
                 else
                 {
-                    item = TryMakeFileItem(entry);
+                    item = TryMakeFileItem(entry, root.SubKey);
                 }
 
                 if (item is not null && !CleanerService.IsProtectedFromCleaning(item.FullPath)
@@ -229,12 +229,12 @@ public sealed class TempScannerService
         return count;
     }
 
-    private static ScanItem? TryMakeFileItem(string file)
+    private static ScanItem? TryMakeFileItem(string file, string? subKey = null)
     {
         try
         {
             var info = new FileInfo(file);
-            return new ScanItem { FullPath = file, SizeBytes = info.Length, IsDirectory = false };
+            return new ScanItem { FullPath = file, SizeBytes = info.Length, IsDirectory = false, SubKey = subKey };
         }
         catch { return null; }
     }
@@ -275,7 +275,9 @@ public sealed class TempScannerService
                 Env("TEMP"), Env("TMP"),
                 Path.Combine(WinDir, "Temp"),
                 Path.Combine(LocalAppData, "Temp")
-            }).Select(p => new Root(p, null))),
+            }).Select(p => new Root(p, null,
+                // System-Temp (C:\Windows\Temp) vs. Nutzer-Temp getrennt gruppieren.
+                SubKey: IsWithinOrEqual(p, Path.Combine(WinDir, "Temp")) ? "sub.windowsTemp" : "sub.userTemp"))),
 
         new(
             "cat.updateCache",
@@ -287,8 +289,8 @@ public sealed class TempScannerService
             CleanupKind.FileDeletion,
             () => new[]
             {
-                new Root(Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer"), "thumbcache_*.db"),
-                new Root(Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer"), "iconcache_*.db")
+                new Root(Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer"), "thumbcache_*.db", SubKey: "sub.thumbCache"),
+                new Root(Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer"), "iconcache_*.db", SubKey: "sub.iconCache")
             }),
 
         new(
@@ -462,8 +464,8 @@ public sealed class TempScannerService
         {
             string cache = Path.Combine(profile, "Cache");
             string codeCache = Path.Combine(profile, "Code Cache");
-            if (Directory.Exists(cache)) roots.Add(new Root(cache, null));
-            if (Directory.Exists(codeCache)) roots.Add(new Root(codeCache, null));
+            if (Directory.Exists(cache)) roots.Add(new Root(cache, null, SubKey: "sub.browserCache"));
+            if (Directory.Exists(codeCache)) roots.Add(new Root(codeCache, null, SubKey: "sub.codeCache"));
         }
     }
 

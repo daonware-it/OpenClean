@@ -20,6 +20,10 @@ public enum StartupStatusFilter
 public sealed class StartupViewModel : ViewModelBase
 {
     private readonly StartupService _service = new();
+
+    // Ladelauf-Zähler: bricht veraltete Icon-Hintergrundläufe ab, sobald neu geladen wird.
+    private int _loadGeneration;
+
     private bool _isBusy;
     private string _statusText = Loc.T("startup.status.loading");
     private StartupStatusFilter _statusFilter = StartupStatusFilter.Alle;
@@ -85,6 +89,7 @@ public sealed class StartupViewModel : ViewModelBase
 
     public async Task LoadAsync()
     {
+        int generation = ++_loadGeneration;
         IsBusy = true;
         StatusText = Loc.T("startup.status.loading");
 
@@ -105,6 +110,38 @@ public sealed class StartupViewModel : ViewModelBase
         StatusText = Entries.Count == 0
             ? Loc.T("startup.status.none")
             : Loc.T("startup.status.summary", Entries.Count, Entries.Count(e => e.IsEnabled));
+
+        // Programm-Icons im Hintergrund aus der EXE extrahieren und live nachtragen
+        // (AppIconService-Cache macht erneutes Laden sofort). Bis dahin Buchstaben-Avatar.
+        _ = LoadIconsAsync(generation);
+    }
+
+    /// <summary>
+    /// Extrahiert die Programm-Icons parallel im Hintergrund (eingefroren, thread-sicher
+    /// übergebbar) und trägt sie per Dispatcher live nach. Bricht ab, sobald ein neuer
+    /// Ladevorgang startet.
+    /// </summary>
+    private async Task LoadIconsAsync(int generation)
+    {
+        var pending = Entries.Where(e => !string.IsNullOrWhiteSpace(e.IconPath)).ToList();
+        if (pending.Count == 0) return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        await Task.Run(() => Parallel.ForEach(pending,
+            new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            (item, state) =>
+            {
+                if (generation != _loadGeneration) { state.Stop(); return; }
+                var icon = AppIconService.GetIcon(item.IconPath);
+                if (icon is null || generation != _loadGeneration) return;
+
+                dispatcher?.InvokeAsync(() =>
+                {
+                    if (generation == _loadGeneration)
+                        item.SetIcon(icon);
+                });
+            }));
     }
 
     /// <summary>Aktualisiert nach einem Sprachwechsel Statuszeile und alle Einträge.</summary>

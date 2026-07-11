@@ -54,6 +54,7 @@ public sealed class DashboardViewModel : ViewModelBase
     public RelayCommand OpenSystemCommand { get; }
     public RelayCommand OpenCleanerCommand { get; }
     public RelayCommand OpenStartupCommand { get; }
+    public RelayCommand RunAllRecommendationsCommand { get; }
 
     public DashboardViewModel(Action<AppSection> navigate, CleanerViewModel cleaner)
     {
@@ -65,9 +66,11 @@ public sealed class DashboardViewModel : ViewModelBase
         OpenSystemCommand = new RelayCommand(_ => _navigate(AppSection.System));
         OpenCleanerCommand = new RelayCommand(_ => _navigate(AppSection.Bereinigung));
         OpenStartupCommand = new RelayCommand(_ => _navigate(AppSection.Autostart));
+        RunAllRecommendationsCommand = new RelayCommand(_ => RunAllRecommendations());
 
-        // RAM live halten (nur Anzeige, keine Aktion). Alle 3 s aktualisieren.
-        _ramTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        // RAM live halten (nur Anzeige, keine Aktion). Jede Sekunde aktualisieren,
+        // damit die Wellenform-Kurve lebendig mitläuft.
+        _ramTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _ramTimer.Tick += (_, _) => RefreshRam();
 
         // Günstige Werte sofort; die schwere Analyse startet EnsureAnalyzed().
@@ -246,11 +249,11 @@ public sealed class DashboardViewModel : ViewModelBase
         int score = 100;
         var factors = new List<ScoreFactor>();
 
-        void Penalty(int points, string description)
+        void Penalty(int points, ScoreFactorKind kind, string description)
         {
             if (points <= 0) return;
             score -= points;
-            factors.Add(new ScoreFactor(description, -points));
+            factors.Add(new ScoreFactor(description, -points, kind));
         }
 
         // 1) Speicherplatz je Laufwerk (echte DriveInfo-Werte).
@@ -258,40 +261,40 @@ public sealed class DashboardViewModel : ViewModelBase
         {
             double freePct = drive.FreePercent;
             if (freePct < 10)
-                Penalty(25, Loc.T("score.factor.driveCritical", drive.Letter, freePct.ToString("0")));
+                Penalty(25, ScoreFactorKind.Storage, Loc.T("score.factor.driveCritical", drive.Letter, freePct.ToString("0")));
             else if (freePct < 20)
-                Penalty(10, Loc.T("score.factor.driveLow", drive.Letter, freePct.ToString("0")));
+                Penalty(10, ScoreFactorKind.Storage, Loc.T("score.factor.driveLow", drive.Letter, freePct.ToString("0")));
         }
 
         // 2) Bereinigbare Temp-/Cache-Größe (echtes ScanAll-Ergebnis).
         double tempGb = _tempBytes / (1024.0 * 1024 * 1024);
         double tempMb = _tempBytes / (1024.0 * 1024);
         if (tempGb > 5)
-            Penalty(20, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
+            Penalty(20, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
         else if (tempGb > 1)
-            Penalty(10, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
+            Penalty(10, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
         else if (tempMb > 200)
-            Penalty(5, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
+            Penalty(5, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
 
         // 3) Autostart (echte StartupService-Daten).
         if (_startupEnabled > 20)
-            Penalty(15, Loc.T("score.factor.startupActive", _startupEnabled));
+            Penalty(15, ScoreFactorKind.Startup, Loc.T("score.factor.startupActive", _startupEnabled));
         else if (_startupEnabled > 10)
-            Penalty(8, Loc.T("score.factor.startupActive", _startupEnabled));
+            Penalty(8, ScoreFactorKind.Startup, Loc.T("score.factor.startupActive", _startupEnabled));
 
         if (_startupHighImpact > 0)
         {
             int highPenalty = Math.Min(_startupHighImpact * 3, 12);
-            Penalty(highPenalty, Loc.T("score.factor.startupHigh", _startupHighImpact));
+            Penalty(highPenalty, ScoreFactorKind.Startup, Loc.T("score.factor.startupHigh", _startupHighImpact));
         }
 
         // 4) RAM-Auslastung (echtes dwMemoryLoad).
         if (_ramValid)
         {
             if (_ramPercent > 90)
-                Penalty(15, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
+                Penalty(15, ScoreFactorKind.Ram, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
             else if (_ramPercent > 80)
-                Penalty(8, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
+                Penalty(8, ScoreFactorKind.Ram, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
         }
 
         score = Math.Clamp(score, 0, 100);
@@ -332,15 +335,21 @@ public sealed class DashboardViewModel : ViewModelBase
     private void BuildRecommendations()
     {
         Recommendations.Clear();
+        var list = new List<Recommendation>();
 
         double tempMb = _tempBytes / (1024.0 * 1024);
         if (tempMb > 200)
         {
-            Recommendations.Add(new Recommendation
+            var severity = tempMb > 1024 ? RecommendationSeverity.Warning : RecommendationSeverity.Info;
+            list.Add(new Recommendation
             {
                 Title = Loc.T("reco.reclaimable.title", ByteFormatter.Format(_tempBytes)),
                 Text = Loc.T("reco.reclaimable.text", _tempItems),
-                Severity = tempMb > 1024 ? RecommendationSeverity.Warning : RecommendationSeverity.Info,
+                Severity = severity,
+                Kind = RecommendationKind.Reclaimable,
+                SeverityTag = SeverityTag(severity),
+                ValueDisplay = ByteFormatter.Format(_tempBytes),
+                ValueUnit = Loc.T("reco.unit.reclaimable"),
                 ActionLabel = Loc.T("common.clean"),
                 ActionCommand = new RelayCommand(_ =>
                 {
@@ -354,26 +363,34 @@ public sealed class DashboardViewModel : ViewModelBase
         // Laufwerke mit kritisch/knapp wenig Speicher.
         foreach (var drive in Drives.Where(d => d.FreePercent < 15))
         {
-            Recommendations.Add(new Recommendation
+            var severity = drive.FreePercent < 10 ? RecommendationSeverity.Critical : RecommendationSeverity.Warning;
+            list.Add(new Recommendation
             {
                 Title = Loc.T("reco.driveFull.title", drive.Letter, drive.UsedPercent.ToString("0")),
                 Text = Loc.T("reco.driveFull.text", drive.FreeDisplay),
-                Severity = drive.FreePercent < 10 ? RecommendationSeverity.Critical : RecommendationSeverity.Warning,
-                ActionLabel = Loc.T("common.clean"),
+                Severity = severity,
+                Kind = RecommendationKind.Storage,
+                SeverityTag = SeverityTag(severity),
+                ValueDisplay = drive.FreeDisplay,
+                ValueUnit = Loc.T("reco.unit.free"),
+                ActionLabel = Loc.T("reco.action.check"),
                 ActionCommand = new RelayCommand(_ => _navigate(AppSection.Bereinigung))
             });
         }
 
         if (_startupEnabled > 10 || _startupHighImpact > 0)
         {
-            Recommendations.Add(new Recommendation
+            var severity = _startupHighImpact > 0 ? RecommendationSeverity.Warning : RecommendationSeverity.Info;
+            list.Add(new Recommendation
             {
                 Title = Loc.T("reco.startup.title", _startupEnabled),
-                Text = _startupHighImpact > 0
-                    ? Loc.T("reco.startup.textHigh", _startupHighImpact)
-                    : Loc.T("reco.startup.textMany"),
-                Severity = _startupHighImpact > 0 ? RecommendationSeverity.Warning : RecommendationSeverity.Info,
-                ActionLabel = Loc.T("dashboard.openStartup"),
+                Text = Loc.T("reco.startup.text", _startupHighImpact),
+                Severity = severity,
+                Kind = RecommendationKind.Startup,
+                SeverityTag = SeverityTag(severity),
+                ValueDisplay = _startupEnabled.ToString(),
+                ValueUnit = Loc.T("reco.unit.active"),
+                ActionLabel = Loc.T("reco.action.view"),
                 ActionCommand = new RelayCommand(_ => _navigate(AppSection.Autostart))
             });
         }
@@ -381,30 +398,75 @@ public sealed class DashboardViewModel : ViewModelBase
         // RAM: rein informativ – KEINE „RAM-Booster“-Aktion (wäre Fake), nur Aktualisieren.
         if (_ramValid && _ramPercent > 85)
         {
-            Recommendations.Add(new Recommendation
+            list.Add(new Recommendation
             {
                 Title = Loc.T("reco.ram.title", _ramPercent.ToString("0")),
                 Text = Loc.T("reco.ram.text"),
                 Severity = RecommendationSeverity.Info,
+                Kind = RecommendationKind.Ram,
+                SeverityTag = SeverityTag(RecommendationSeverity.Info),
+                ValueDisplay = _ramPercent.ToString("0") + " %",
+                ValueUnit = Loc.T("reco.unit.load"),
                 ActionLabel = Loc.T("common.refresh"),
                 ActionCommand = RefreshRamCommand
             });
         }
 
-        if (Recommendations.Count == 0)
+        if (list.Count == 0)
         {
-            Recommendations.Add(new Recommendation
+            list.Add(new Recommendation
             {
                 Title = Loc.T("reco.allGood.title"),
                 Text = Loc.T("reco.allGood.text"),
-                Severity = RecommendationSeverity.Positive
+                Severity = RecommendationSeverity.Positive,
+                Kind = RecommendationKind.AllGood,
+                SeverityTag = SeverityTag(RecommendationSeverity.Positive)
             });
         }
 
+        // Dringlichste zuerst (Kritisch → Warnung → Hinweis), Reihenfolge sonst stabil.
+        foreach (var r in list.OrderByDescending(r => (int)r.Severity))
+            Recommendations.Add(r);
+
         OnPropertyChanged(nameof(HasRecommendations));
+        OnPropertyChanged(nameof(RecommendationCount));
+        OnPropertyChanged(nameof(HasActionableRecommendations));
+    }
+
+    /// <summary>Lokalisierter Status-Tag je Dringlichkeit (Kritisch/Empfohlen/Hinweis/Optimal).</summary>
+    private static string SeverityTag(RecommendationSeverity severity) => severity switch
+    {
+        RecommendationSeverity.Critical => Loc.T("reco.tag.critical"),
+        RecommendationSeverity.Warning => Loc.T("reco.tag.recommended"),
+        RecommendationSeverity.Info => Loc.T("reco.tag.hint"),
+        _ => Loc.T("reco.tag.good")
+    };
+
+    /// <summary>Führt die sinnvollen Empfehlungs-Aktionen aus („Alle ausführen“).</summary>
+    private void RunAllRecommendations()
+    {
+        RefreshRam();
+
+        // Speicher-/Bereinigungs-Empfehlungen bündeln in einem Scan im Bereinigen-Bereich.
+        if (Recommendations.Any(r => r.Kind is RecommendationKind.Reclaimable or RecommendationKind.Storage))
+        {
+            _navigate(AppSection.Bereinigung);
+            if (_cleaner.ScanCommand.CanExecute(null))
+                _cleaner.ScanCommand.Execute(null);
+        }
+        else if (Recommendations.Any(r => r.Kind == RecommendationKind.Startup))
+        {
+            _navigate(AppSection.Autostart);
+        }
     }
 
     public bool HasRecommendations => Recommendations.Count > 0;
+
+    /// <summary>Anzahl der Empfehlungen (für den Zähler-Badge im Kopf).</summary>
+    public int RecommendationCount => Recommendations.Count;
+
+    /// <summary>Gibt es mindestens eine Empfehlung mit ausführbarer Aktion? (steuert „Alle ausführen“).</summary>
+    public bool HasActionableRecommendations => Recommendations.Any(r => r.HasAction);
 
     /// <summary>Baut nach einem Sprachwechsel alle berechneten Texte neu auf.</summary>
     public void Relocalize()

@@ -14,13 +14,28 @@ public enum ScoreLevel
 }
 
 /// <summary>
+/// Art eines Score-Faktors – bestimmt das thematische Icon in der Overview
+/// (Laufwerk, bereinigbarer Speicher, Autostart, RAM).
+/// </summary>
+public enum ScoreFactorKind
+{
+    Storage,
+    Reclaimable,
+    Startup,
+    Ram
+}
+
+/// <summary>
 /// Ein einzelner, nachvollziehbarer Faktor, der den Score gemindert hat.
 /// <paramref name="Points"/> ist der (negative) Punktabzug, z. B. -10.
 /// </summary>
-public sealed record ScoreFactor(string Description, int Points)
+public sealed record ScoreFactor(string Description, int Points, ScoreFactorKind Kind)
 {
     /// <summary>Anzeige wie „−10 Punkte“ (echtes Minuszeichen).</summary>
     public string PointsDisplay => $"−{Math.Abs(Points)}";
+
+    /// <summary>Balkenlänge relativ zum größten Einzelabzug (Kappung bei 25 Punkten) in Prozent.</summary>
+    public double BarPercent => System.Math.Min(System.Math.Abs(Points) / 25.0 * 100.0, 100.0);
 }
 
 /// <summary>

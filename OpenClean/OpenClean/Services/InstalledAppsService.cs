@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using OpenClean.Models;
 
@@ -91,12 +93,23 @@ public sealed class InstalledAppsService
 
         string installLocation = GetString(key, "InstallLocation").Trim().Trim('"');
 
+        // Version: Registry-DisplayVersion; fehlt sie (typisch bei Steam-Spielen),
+        // als Ersatz die Steam-Build-ID aus dem App-Manifest verwenden.
+        string version = GetString(key, "DisplayVersion");
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            string? steamAppId = SteamAppId(subKeyName, uninstallString);
+            if (steamAppId is not null)
+                version = SteamCatalog.GetBuildId(steamAppId) is { } build ? $"Build {build}" : version;
+        }
+
         return new InstalledApp
         {
             Name = name.Trim(),
-            Version = GetString(key, "DisplayVersion"),
+            Version = version,
             Publisher = GetString(key, "Publisher"),
             InstallLocation = installLocation,
+            IconPath = ResolveIconPath(key),
             SizeFolder = ResolveSizeFolder(installLocation, key),
             EstimatedBytes = sizeBytes,
             InstallDate = ParseInstallDate(GetString(key, "InstallDate")),
@@ -220,6 +233,34 @@ public sealed class InstalledAppsService
         }
 
         return "";
+    }
+
+    /// <summary>
+    /// Beste Quelle zum Extrahieren des Programm-Icons: der DisplayIcon-Pfad (ohne Index),
+    /// wenn die Datei existiert. Leer, wenn nichts Brauchbares vorliegt (dann Buchstaben-Avatar).
+    /// Bewusst KEIN Raten im Installationsordner – das wäre langsam und unzuverlässig.
+    /// </summary>
+    private static string ResolveIconPath(RegistryKey key)
+    {
+        string? icon = DisplayIconPath(key);
+        return !string.IsNullOrWhiteSpace(icon) && File.Exists(icon) ? icon! : "";
+    }
+
+    /// <summary>
+    /// Ermittelt die Steam-appid eines Eintrags: aus dem Schlüsselnamen „Steam App &lt;id&gt;"
+    /// oder aus einem <c>steam://uninstall/&lt;id&gt;</c>-Kommando. <c>null</c>, wenn kein Steam-Eintrag.
+    /// </summary>
+    private static string? SteamAppId(string subKeyName, string uninstallString)
+    {
+        const string prefix = "Steam App ";
+        if (subKeyName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string id = subKeyName[prefix.Length..].Trim();
+            if (id.Length > 0 && id.All(char.IsDigit)) return id;
+        }
+
+        var m = Regex.Match(uninstallString ?? "", @"steam://uninstall/(\d+)", RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value : null;
     }
 
     /// <summary>DisplayIcon-Pfad ohne Anführungszeichen und ohne Icon-Index („…,0").</summary>

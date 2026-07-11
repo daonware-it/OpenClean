@@ -80,9 +80,16 @@
                                  IsChecked="{Binding StatusFilter, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Deaktiviert}" />
                 </StackPanel>
-                <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
-                        VerticalAlignment="Center"
-                        Command="{Binding RefreshCommand}" />
+                <Button Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                        Command="{Binding RefreshCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              Data="M23 4 v6 h-6 M1 20 v-6 h6 M3.51 9 a9 9 0 0 1 14.85 -3.36 L23 10 M1 17 l4.64 4.36 A9 9 0 0 0 20.49 15" />
+                        <TextBlock Text="{loc:Loc common.refresh}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 
@@ -128,14 +135,31 @@
                                         <ColumnDefinition Width="70" />
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Name + command -->
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Command}" Style="{StaticResource MutedText}"
-                                                   FontSize="11.5" Margin="0,3,0,0"
-                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Command}" />
-                                    </StackPanel>
+                                    <!-- Echtes Programm-Icon, sonst farbiger Buchstaben-Avatar -->
+                                    <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Grid.Column="0" Width="34" Height="34" Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <Border CornerRadius="8" Background="{Binding InitialBrush}"
+                                                    Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                                <TextBlock Text="{Binding Initial}" Foreground="White" FontWeight="Bold"
+                                                           FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Image Source="{Binding Icon}" Width="30" Height="30"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Command}" Style="{StaticResource MutedText}"
+                                                       FontSize="11.5" Margin="0,3,0,0"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Command}" />
+                                        </StackPanel>
+                                    </Grid>
 
                                     <!-- Publisher -->
                                     <TextBlock Grid.Column="1" Text="{Binding PublisherDisplay}"
@@ -207,7 +231,7 @@
                                Foreground="{DynamicResource TextMutedBrush}"
                                FontSize="10.5" Opacity="0.75" Margin="0,3,0,0" />
                 </StackPanel>
-                <ProgressBar IsIndeterminate="True" Width="160" HorizontalAlignment="Right"
+                <ProgressBar Style="{StaticResource LoadingBar}" Width="160" HorizontalAlignment="Right"
                              VerticalAlignment="Center"
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
             </Grid>

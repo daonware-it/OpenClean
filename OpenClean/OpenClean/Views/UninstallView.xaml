@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:OpenClean.Views"
+             xmlns:conv="clr-namespace:OpenClean.Converters"
              xmlns:loc="clr-namespace:OpenClean.Services.Localization"
              mc:Ignorable="d"
              d:DesignHeight="720" d:DesignWidth="920"
@@ -11,6 +12,7 @@
              FontFamily="{StaticResource AppFont}">
     <UserControl.Resources>
         <local:EnumToBoolConverter x:Key="EnumToBool" />
+        <conv:PercentToStarConverter x:Key="PctStar" />
 
         <!-- Suchfeld -->
         <Style x:Key="SearchBoxStyle" TargetType="TextBox">
@@ -110,21 +112,36 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Grid>
-                <!-- Sortierung -->
+                <!-- Sortierung (Größe mit Richtungspfeil ▲/▼, Klick schaltet um) -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="Sort" Tag="8,0,0,8"
-                                 Content="{loc:Loc uninstall.sort.size}"
-                                 IsChecked="{Binding Sort, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter=Groesse}" />
+                                 IsChecked="{Binding IsSortSize, Mode=OneWay}" Command="{Binding SortBySizeCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{loc:Loc uninstall.sort.size}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding SizeArrow}" FontSize="10" Margin="6,0,0,0" VerticalAlignment="Center"
+                                       Visibility="{Binding IsSortSize, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </RadioButton>
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="Sort" Tag="0,8,8,0" Margin="-1,0,0,0"
                                  Content="{loc:Loc uninstall.sort.name}"
-                                 IsChecked="{Binding Sort, Mode=TwoWay, Converter={StaticResource EnumToBool}, ConverterParameter=Name}" />
+                                 IsChecked="{Binding IsSortName, Mode=OneWay}" Command="{Binding SortByNameCommand}" />
                 </StackPanel>
-                <Button Content="{loc:Loc common.refresh}" Style="{StaticResource SecondaryButton}"
-                        VerticalAlignment="Center" Command="{Binding RefreshCommand}" />
+                <Button Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Command="{Binding RefreshCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              Data="M23 4 v6 h-6 M1 20 v-6 h6 M3.51 9 a9 9 0 0 1 14.85 -3.36 L23 10 M1 17 l4.64 4.36 A9 9 0 0 0 20.49 15" />
+                        <TextBlock Text="{loc:Loc common.refresh}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <Button Style="{StaticResource PrimaryButton}"
                         VerticalAlignment="Center" Margin="12,0,0,0"
                         Command="{Binding UninstallSelectedCommand}">
                     <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Data="M5 6 H19 L18 21 H6 Z M9 3 H15 V6 H9 Z" />
                         <TextBlock Text="{loc:Loc uninstall.action.uninstallSelected}" VerticalAlignment="Center" />
                         <!-- Schloss-Symbol (Segoe MDL2 Assets), solange die Batch-Deinstallation nicht freigeschaltet ist -->
                         <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
@@ -224,7 +241,7 @@
                     <ColumnDefinition Width="40" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="130" />
-                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="150" />
                     <ColumnDefinition Width="130" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="1" Text="{loc:Loc uninstall.col.program}" Style="{StaticResource MutedText}"
@@ -250,28 +267,79 @@
                                         <ColumnDefinition Width="40" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="130" />
-                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="150" />
                                         <ColumnDefinition Width="130" />
                                     </Grid.ColumnDefinitions>
 
                                     <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                               IsEnabled="{Binding CanUninstall}" VerticalAlignment="Center" />
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
-                                        <TextBlock Text="{Binding PublisherDisplay}" Style="{StaticResource MutedText}"
-                                                   FontSize="11.5" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding InstallDateDisplay}" />
-                                    </StackPanel>
+                                    <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Echtes Programm-Icon, sonst farbiger Buchstaben-Avatar -->
+                                        <Grid Grid.Column="0" Width="34" Height="34" Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <Border CornerRadius="8" Background="{Binding InitialBrush}"
+                                                    Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                                <TextBlock Text="{Binding Initial}" Foreground="White" FontWeight="Bold"
+                                                           FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Image Source="{Binding Icon}" Width="30" Height="30"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                            <TextBlock Text="{Binding PublisherDisplay}" Style="{StaticResource MutedText}"
+                                                       FontSize="11.5" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding InstallDateDisplay}" />
+                                        </StackPanel>
+                                    </Grid>
 
                                     <TextBlock Grid.Column="2" Text="{Binding Version}" VerticalAlignment="Center"
                                                FontSize="12.5" Foreground="{DynamicResource TextMutedBrush}"
+                                               FontFamily="{StaticResource MonoFont}"
                                                TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
 
-                                    <TextBlock Grid.Column="3" Text="{Binding SizeDisplay}" VerticalAlignment="Center"
-                                               FontSize="12.5" FontWeight="SemiBold"
-                                               TextAlignment="Left" Margin="0,0,12,0" />
+                                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding SizeDisplay}" FontSize="12.5" FontWeight="SemiBold"
+                                                       FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center" />
+                                            <Border CornerRadius="5" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Background="#26EAB308"
+                                                    Visibility="{Binding IsBig, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{loc:Loc uninstall.big}" FontSize="9" FontWeight="Bold"
+                                                           Foreground="{DynamicResource WarnBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <Border Height="4" CornerRadius="2" Background="{DynamicResource BgDeepBrush}"
+                                                Margin="0,5,0,0" ClipToBounds="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="{Binding SizeBarPercent, Converter={StaticResource PctStar}}" />
+                                                    <ColumnDefinition Width="{Binding SizeBarPercent, Converter={StaticResource PctStar}, ConverterParameter=inv}" />
+                                                </Grid.ColumnDefinitions>
+                                                <Rectangle Grid.Column="0" RadiusX="2" RadiusY="2">
+                                                    <Rectangle.Style>
+                                                        <Style TargetType="Rectangle">
+                                                            <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBig}" Value="True">
+                                                                    <Setter Property="Fill" Value="{DynamicResource WarnBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Rectangle.Style>
+                                                </Rectangle>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
 
                                     <Button Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center"
                                             Content="{loc:Loc uninstall.action.uninstall}"

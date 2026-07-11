@@ -21,12 +21,36 @@
             <BooleanToVisibilityConverter x:Key="BuiltInBoolToVis" />
 
             <FontFamily x:Key="AppFont">Segoe UI Variable, Segoe UI</FontFamily>
+            <!-- Monospace für Kennzahlen (RAM-%, Größen, Versionen) – „technischer" Look
+                 wie in der Design-Vorlage, ohne Font-Bundling (Windows-eigene Schriften). -->
+            <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Consolas</FontFamily>
 
             <!-- ============ Base text ============ -->
             <Style TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+            </Style>
+
+            <!-- ============ ToolTip (themed) ============ -->
+            <!-- Ohne diesen Style rendern Tooltips im dunklen Theme als weiße Windows-Kästen. -->
+            <Style TargetType="ToolTip">
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="HasDropShadow" Value="True" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToolTip">
+                            <Border Background="{DynamicResource BgDeepBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="HeaderText" TargetType="TextBlock">
@@ -367,6 +391,23 @@
                                           Opacity="0.18" Color="#FF000000" />
                     </Setter.Value>
                 </Setter>
+            </Style>
+
+            <!-- Interaktive Karte: beim Hovern Akzent-Rand + etwas stärkerer Schatten.
+                 Nur für anklickbare Kacheln (z. B. Dashboard-Statistik-Kacheln) verwenden. -->
+            <Style x:Key="HoverCard" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Cursor" Value="Hand" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                        <Setter Property="Effect">
+                            <Setter.Value>
+                                <DropShadowEffect BlurRadius="26" ShadowDepth="3" Direction="270"
+                                                  Opacity="0.30" Color="#FF000000" />
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <!-- ============ Fenster-Buttons (eigene Titelleiste) ============ -->

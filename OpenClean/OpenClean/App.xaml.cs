@@ -97,7 +97,7 @@ public partial class App : Application
             }
 
             var result = new AutoCleanService().Run(schedule);
-            var report = new AutoCleanReportStore().Add(schedule.Profile, result, DateTime.Now);
+            var report = new AutoCleanReportStore().Add(schedule, result, DateTime.Now);
 
             if (schedule.Notify)
             {

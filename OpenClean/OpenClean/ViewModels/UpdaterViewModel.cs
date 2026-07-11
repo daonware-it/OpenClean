@@ -13,6 +13,9 @@ public sealed class UpdaterViewModel : ViewModelBase
 {
     private readonly WingetService _service = new();
 
+    // Ladelauf-Zähler: bricht veraltete Icon-Hintergrundläufe ab, sobald neu geladen wird.
+    private int _loadGeneration;
+
     private bool _isBusy;
     private bool _wingetAvailable = true;
     private string _statusText = Loc.T("updater.status.loading");
@@ -85,6 +88,7 @@ public sealed class UpdaterViewModel : ViewModelBase
 
     public async Task LoadAsync()
     {
+        int generation = ++_loadGeneration;
         IsBusy = true;
         ProgressIsIndeterminate = true; // Scan hat keinen bezifferbaren Fortschritt → Marquee.
         StatusText = Loc.T("updater.status.loading");
@@ -113,6 +117,94 @@ public sealed class UpdaterViewModel : ViewModelBase
             ? Loc.T("updater.status.none")
             : Loc.T("updater.status.summary", Updates.Count);
         UpdateAllCommand.RaiseCanExecuteChanged();
+
+        // Echte Programm-Icons im Hintergrund nachladen (winget liefert keine Icons;
+        // Quelle sind die Uninstall-Registry-Einträge). Bis dahin Buchstaben-Avatar.
+        _ = LoadIconsAsync(generation);
+    }
+
+    /// <summary>
+    /// Ordnet den winget-Updates die Icons der installierten Programme zu: die
+    /// Uninstall-Registry (DisplayIcon) wird einmal gelesen, per Anzeigename dem
+    /// Update zugeordnet und das Icon eingefroren extrahiert (AppIconService-Cache).
+    /// Ergebnisse werden per Dispatcher live nachgetragen; ein neuer Ladevorgang
+    /// bricht den Lauf ab.
+    /// </summary>
+    private async Task LoadIconsAsync(int generation)
+    {
+        var items = Updates.ToList();
+        if (items.Count == 0) return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        await Task.Run(() =>
+        {
+            List<(string Name, string IconPath)> installed;
+            try
+            {
+                installed = new InstalledAppsService().GetInstalledApps()
+                    .Where(a => !string.IsNullOrWhiteSpace(a.IconPath))
+                    .Select(a => (a.Name, a.IconPath))
+                    .ToList();
+            }
+            catch { return; } // Registry nicht lesbar → Avatare bleiben stehen
+
+            foreach (var item in items)
+            {
+                if (generation != _loadGeneration) return;
+
+                string? path = FindIconPath(installed, item.Name);
+                if (path is null) continue;
+
+                var icon = AppIconService.GetIcon(path);
+                if (icon is null || generation != _loadGeneration) continue;
+
+                dispatcher?.InvokeAsync(() =>
+                {
+                    if (generation == _loadGeneration)
+                        item.SetIcon(icon);
+                });
+            }
+        });
+    }
+
+    /// <summary>
+    /// Sucht den Icon-Pfad zum winget-Anzeigenamen: exakter Namenstreffer zuerst,
+    /// sonst Präfix-Treffer in beide Richtungen (Registry-Namen tragen oft Versions-/
+    /// Architektur-Suffixe wie „7-Zip 24.08 (x64)"). Ein Präfix zählt nur, wenn danach
+    /// kein Buchstabe folgt – „Git" darf nicht auf „GitHub Desktop" matchen.
+    /// </summary>
+    private static string? FindIconPath(List<(string Name, string IconPath)> installed, string updateName)
+    {
+        if (string.IsNullOrWhiteSpace(updateName)) return null;
+
+        foreach (var (name, icon) in installed)
+            if (string.Equals(name, updateName, StringComparison.OrdinalIgnoreCase))
+                return icon;
+
+        string? best = null;
+        int bestLen = 0;
+        foreach (var (name, icon) in installed)
+        {
+            if (!IsPrefixMatch(name, updateName) && !IsPrefixMatch(updateName, name)) continue;
+
+            int len = Math.Min(name.Length, updateName.Length);
+            if (len > bestLen)
+            {
+                bestLen = len;
+                best = icon;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>True, wenn <paramref name="longer"/> mit <paramref name="prefix"/> beginnt
+    /// und an der Grenze kein Buchstabe folgt (Wortgrenze).</summary>
+    private static bool IsPrefixMatch(string longer, string prefix)
+    {
+        if (longer.Length <= prefix.Length) return false;
+        if (!longer.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        return !char.IsLetter(longer[prefix.Length]);
     }
 
     /// <summary>

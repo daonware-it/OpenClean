@@ -15,6 +15,12 @@ public sealed class ScanItem : ViewModelBase
     public bool IsDirectory { get; init; }
 
     /// <summary>
+    /// Optionaler Basis-Lokalisierungsschlüssel der Unterkategorie (z. B. "sub.browserCache").
+    /// <c>null</c> = keine besondere Unterteilung; das Item landet in der generischen Gruppe.
+    /// </summary>
+    public string? SubKey { get; init; }
+
+    /// <summary>
     /// Nur für Papierkorb-Einträge gesetzt: die tatsächlichen Löschziele in
     /// <c>$Recycle.Bin</c> (<c>$R</c>-Daten- und <c>$I</c>-Metadatei). <see cref="FullPath"/>
     /// zeigt bei diesen Einträgen den Originalpfad (für die Anzeige), gelöscht werden aber

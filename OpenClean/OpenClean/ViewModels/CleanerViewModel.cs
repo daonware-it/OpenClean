@@ -39,6 +39,10 @@ public sealed class CleanerViewModel : ViewModelBase
     {
         foreach (var category in _scanner.CreateCategories())
         {
+            // Echtes Browser-Icon (Chrome/Edge/Brave/Firefox); null für andere Kategorien.
+            // WICHTIG: vor HookCategory setzen – sonst löst das PropertyChanged bereits
+            // RefreshSelectionState() aus, bevor die Commands initialisiert sind (NRE).
+            category.IconImage = BrowserIcons.Resolve(category.Key);
             HookCategory(category);
             Categories.Add(category);
         }
@@ -176,6 +180,14 @@ public sealed class CleanerViewModel : ViewModelBase
         foreach (var (category, items) in scanned)
         {
             foreach (var item in items)
+                category.Items.Add(item);
+
+            // Nach dem Befüllen in Unterkategorien gruppieren (referenziert dieselben Items).
+            category.RebuildSubcategories();
+
+            // Ein Einzel-Toggle aktualisiert Kategorie (kaskadiert zu allen Unterkategorien)
+            // und die Gesamtauswahl.
+            foreach (var item in category.Items)
             {
                 item.SelectionChanged = () =>
                 {
@@ -183,7 +195,6 @@ public sealed class CleanerViewModel : ViewModelBase
                     category.RefreshTotals();
                     RefreshSelectionState();
                 };
-                category.Items.Add(item);
             }
         }
 
