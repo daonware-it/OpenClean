@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-11
+
+### Added
+- Real application icons in the Updates view: winget updates are matched to the
+  installed programs' registry entries and show the actual program icon, with a
+  colored letter avatar as fallback.
+- Real application icons in the Startup view, extracted from each entry's
+  resolved executable (letter avatar for Store apps and unresolvable commands).
+- Schedule: new "Report storage" section – reports after automatic runs can be
+  turned off entirely, and the history retention is selectable (10/30/100).
+
+### Changed
+- Startup, Privacy, Updates, Schedule and Duplicates views were aligned with
+  the redesigned look of Overview, Storage & RAM, Cleanup and Uninstall (icon
+  buttons, icon chips, mono metrics, soft badges, animated loading bars).
+- Schedule view redesigned: frequency pills, cleaner profile rows with
+  RECOMMENDED/RISK tags, outline icons and restructured cards.
+- Available versions in the Updates view are highlighted as accent badges and
+  version numbers use the monospace metric font.
+- Repository product screenshots were refreshed to reflect the redesigned UI
+  (Overview, Storage & RAM, Cleanup, Uninstall and Software updates), all
+  captured with the English UI.
+
 ## [1.0.2] - 2026-07-11
 
 ### Fixed
@@ -52,7 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 UI languages: German, English, Spanish, French, Polish, Portuguese, Russian.
 - Open-core Premium module: scheduled cleaning and batch uninstall.
 
-[Unreleased]: https://github.com/daonware-it/OpenClean/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/daonware-it/OpenClean/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/daonware-it/OpenClean/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/daonware-it/OpenClean/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/daonware-it/OpenClean/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/daonware-it/OpenClean/releases/tag/v1.0.0

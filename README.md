@@ -4,7 +4,7 @@
 
 **Honest system cleaning for Windows — real measurements, no telemetry, no dark patterns.**
 
-[![Version](https://img.shields.io/badge/version-1.0.2-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
 [![Downloads](https://img.shields.io/github/downloads/daonware-it/OpenClean/total?color=2ecc87&label=downloads)](https://github.com/daonware-it/OpenClean/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d6)](#download)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4)](https://dotnet.microsoft.com/)
@@ -44,9 +44,9 @@ Premium unlocks are handled by a signed, device-bound license. See [Privacy](#pr
 |---|---|
 | ![Storage & RAM](Screenshots/02-speicher-ram.png) | ![Cleanup](Screenshots/03-bereinigung.png) |
 
-| Uninstall | Duplicate finder |
+| Uninstall | Software updates |
 |---|---|
-| ![Uninstall](Screenshots/04-deinstallation.png) | ![Duplicates](Screenshots/05-duplikate.png) |
+| ![Uninstall](Screenshots/04-deinstallation.png) | ![Software updates](Screenshots/06_software-updates.png) |
 
 ## Download
 
