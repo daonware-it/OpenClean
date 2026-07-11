@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-11
+
+### Fixed
+- The per-drive usage line in the Storage & RAM view (and its space warnings)
+  was always shown in German ("… von … belegt · … frei"), even when the app
+  language was set to English or another language; it now uses the localized
+  strings for every language.
+
 ## [1.0.1] - 2026-07-07
 
 ### Added
@@ -44,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 UI languages: German, English, Spanish, French, Polish, Portuguese, Russian.
 - Open-core Premium module: scheduled cleaning and batch uninstall.
 
-[Unreleased]: https://github.com/daonware-it/OpenClean/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/daonware-it/OpenClean/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/daonware-it/OpenClean/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/daonware-it/OpenClean/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/daonware-it/OpenClean/releases/tag/v1.0.0

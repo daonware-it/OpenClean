@@ -45,7 +45,11 @@ public sealed class DriveUsage
     public string TotalDisplay => Services.ByteFormatter.Format(TotalBytes);
 
     public string SummaryDisplay =>
-        $"{Services.ByteFormatter.Format(UsedBytes)} von {Services.ByteFormatter.Format(TotalBytes)} belegt · {Services.ByteFormatter.Format(FreeBytes)} frei";
+        Services.Localization.LocalizationManager.Instance.Get(
+            "system.drive.summary",
+            Services.ByteFormatter.Format(UsedBytes),
+            Services.ByteFormatter.Format(TotalBytes),
+            Services.ByteFormatter.Format(FreeBytes));
 
     public string PercentDisplay => $"{UsedPercent:0} %";
 
@@ -60,8 +64,10 @@ public sealed class DriveUsage
 
     public string WarningText => WarningLevel switch
     {
-        DriveWarningLevel.Critical => $"Kritisch – nur {FreePercent:0} % frei",
-        DriveWarningLevel.Low => $"Knapp – nur {FreePercent:0} % frei",
+        DriveWarningLevel.Critical => Services.Localization.LocalizationManager.Instance.Get(
+            "system.drive.warnCritical", $"{FreePercent:0}"),
+        DriveWarningLevel.Low => Services.Localization.LocalizationManager.Instance.Get(
+            "system.drive.warnLow", $"{FreePercent:0}"),
         _ => ""
     };
 }

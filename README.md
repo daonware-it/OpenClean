@@ -4,7 +4,8 @@
 
 **Honest system cleaning for Windows — real measurements, no telemetry, no dark patterns.**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
+[![Version](https://img.shields.io/badge/version-1.0.2-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
+[![Downloads](https://img.shields.io/github/downloads/daonware-it/OpenClean/total?color=2ecc87&label=downloads)](https://github.com/daonware-it/OpenClean/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d6)](#download)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4)](https://dotnet.microsoft.com/)
 [![Open Core](https://img.shields.io/badge/model-open--core-f39c12)](#license)
