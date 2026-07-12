@@ -83,6 +83,49 @@
 
                 <!-- Footer -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="24,0,20,18">
+                    <!-- Pro-Karte: immer sichtbarer Einstieg zur Lizenz-Seite.
+                         GroupName="Nav", damit die Nav-Auswahl konsistent bleibt. -->
+                    <RadioButton x:Name="NavLicense" GroupName="Nav" Cursor="Hand" Margin="0,0,0,16"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Lizenz}">
+                        <RadioButton.Template>
+                            <ControlTemplate TargetType="RadioButton">
+                                <Border x:Name="bd" CornerRadius="12" Padding="14,12"
+                                        Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </RadioButton.Template>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform"
+                                  VerticalAlignment="Center" Margin="0,0,10,0"
+                                  Fill="{DynamicResource AccentBrush}"
+                                  Data="M12 2 L15 9 L22 9.5 L17 14 L18.5 21 L12 17.5 L5.5 21 L7 14 L2 9.5 L9 9 Z" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{loc:Loc license.sidebar.title}" FontSize="12.5" FontWeight="SemiBold" />
+                                <TextBlock Text="{loc:Loc license.sidebar.active}"
+                                           Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0"
+                                           Visibility="{Binding IsPremium, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Text="{loc:Loc license.sidebar.inactive}"
+                                           Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0"
+                                           Visibility="{Binding IsPremium, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                            </StackPanel>
+                        </Grid>
+                    </RadioButton>
                     <Border Height="1" Background="{DynamicResource BorderBrush}"
                             Opacity="0.6" Margin="0,0,0,14" />
                     <StackPanel Orientation="Horizontal">
@@ -150,6 +193,16 @@
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 2 C14.5 4.5 16 8.5 16 13 L8 13 C8 8.5 9.5 4.5 12 2 Z M8 11.5 L5 15 L5.5 17.5 L8 15.8 Z M16 11.5 L19 15 L18.5 17.5 L16 15.8 Z M10 16 L12 21 L14 16 Z M12 7 m -1.6 0 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0" />
                             <TextBlock Text="{loc:Loc nav.startup}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavContextMenu" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Kontextmenue}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M4 3 H20 V21 H4 Z M7 7 H17 V9 H7 Z M7 11 H17 V13 H7 Z M7 15 H13 V17 H7 Z" />
+                            <TextBlock Text="{loc:Loc nav.contextmenu}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavPrivacy" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -221,6 +274,8 @@
                                Visibility="{Binding IsChecked, ElementName=NavCleaner, Converter={StaticResource BoolToVis}}" />
             <views:StartupView DataContext="{Binding Startup}"
                                Visibility="{Binding IsChecked, ElementName=NavStartup, Converter={StaticResource BoolToVis}}" />
+            <views:ContextMenuView DataContext="{Binding ContextMenu}"
+                                   Visibility="{Binding IsChecked, ElementName=NavContextMenu, Converter={StaticResource BoolToVis}}" />
             <views:PrivacyView DataContext="{Binding Privacy}"
                                Visibility="{Binding IsChecked, ElementName=NavPrivacy, Converter={StaticResource BoolToVis}}" />
             <views:UpdaterView DataContext="{Binding Updater}"
@@ -232,6 +287,8 @@
                                  Visibility="{Binding IsChecked, ElementName=NavUninstall, Converter={StaticResource BoolToVis}}" />
             <views:DuplicatesView DataContext="{Binding Duplicates}"
                                   Visibility="{Binding IsChecked, ElementName=NavDuplicates, Converter={StaticResource BoolToVis}}" />
+            <views:LicenseView DataContext="{Binding License}"
+                               Visibility="{Binding IsChecked, ElementName=NavLicense, Converter={StaticResource BoolToVis}}" />
         </Grid>
     </Grid>
 </Window>

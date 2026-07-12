@@ -14,11 +14,13 @@ public enum AppSection
     System,
     Bereinigung,
     Autostart,
+    Kontextmenue,
     Privatsphaere,
     Updates,
     Zeitplan,
     Deinstallation,
-    Duplikate
+    Duplikate,
+    Lizenz
 }
 
 /// <summary>
@@ -34,11 +36,13 @@ public sealed class MainViewModel : ViewModelBase
 
     public CleanerViewModel Cleaner { get; } = new();
     public StartupViewModel Startup { get; } = new();
+    public ContextMenuViewModel ContextMenu { get; } = new();
     public PrivacyViewModel Privacy { get; } = new();
     public UpdaterViewModel Updater { get; } = new();
     public UninstallViewModel Uninstall { get; } = new();
     public DuplicatesViewModel Duplicates { get; } = new();
     public DashboardViewModel Dashboard { get; }
+    public LicensePageViewModel License { get; } = new();
 
     public MainViewModel()
     {
@@ -71,10 +75,12 @@ public sealed class MainViewModel : ViewModelBase
             Cleaner.Relocalize();
             Privacy.Relocalize();
             Startup.Relocalize();
+            ContextMenu.Relocalize();
             Updater.Relocalize();
             _lockedSchedule?.Relocalize();
             Uninstall.Relocalize();
             Duplicates.Relocalize();
+            License.Relocalize();
         };
     }
 
@@ -113,6 +119,9 @@ public sealed class MainViewModel : ViewModelBase
     /// <summary>True, wenn der Zeitplan freigeschaltet ist (steuert das Schloss-Symbol in der Nav).</summary>
     public bool IsScheduleUnlocked => _scheduleSectionContent is not null and not LockedSectionView;
 
+    /// <summary>True bei gültiger Lizenz – steuert die Pro-Karte im Sidebar-Footer.</summary>
+    public bool IsPremium => PremiumService.Instance.IsPremium;
+
     private void BuildScheduleSection()
     {
         IPremiumSection? section = PremiumService.Instance.HasFeature(PremiumContract.FeatureSchedule)
@@ -131,6 +140,7 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(IsScheduleUnlocked));
+        OnPropertyChanged(nameof(IsPremium));
     }
 
     public string AppTitle => "OpenClean";
