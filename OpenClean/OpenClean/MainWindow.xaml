@@ -150,7 +150,9 @@
                                FontSize="11" Margin="1,14,0,0" />
                 </StackPanel>
 
-                <!-- Nav -->
+                <!-- Nav: in ScrollViewer, damit bei kleiner Fensterhöhe (z.B. MinHeight) alle Einträge
+                     trotz der Pro-Karte im Footer erreichbar bleiben, statt vom Footer überlappt zu werden. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="0,10,0,0">
                     <TextBlock Text="{loc:Loc sidebar.navigation}" Style="{StaticResource MutedText}"
                                FontSize="10.5" FontWeight="SemiBold" Margin="26,0,0,8"
@@ -261,6 +263,7 @@
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
