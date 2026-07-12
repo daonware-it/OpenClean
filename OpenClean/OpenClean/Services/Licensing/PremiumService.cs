@@ -200,6 +200,50 @@ public sealed class PremiumService
         return false; // Network/DeviceLimit → Offline-Zustand belassen.
     }
 
+    /// <summary>
+    /// Gibt dieses Gerät frei: meldet den Schlüssel beim Server ab (der Geräte-Slot wird
+    /// wieder frei) und entfernt danach Token und Modul lokal. Ein reiner Netzwerkfehler
+    /// entfernt NICHTS – ob trotzdem nur lokal entfernt wird, entscheidet das UI
+    /// (<see cref="RemoveLocally"/>). Liefert <see cref="LicenseApiError.None"/> bei Erfolg.
+    /// </summary>
+    public async Task<LicenseApiError> DeactivateAsync()
+    {
+        string? key = LicenseService.Instance.LicenseKey;
+        if (string.IsNullOrWhiteSpace(key)) return LicenseApiError.None; // nichts zu tun
+
+        var result = await new LicenseApiClient().DeactivateAsync(key);
+
+        // Erfolg ODER "Schlüssel unbekannt/widerrufen" (serverseitig ohnehin weg)
+        // -> lokal entfernen; beides ist aus Nutzersicht eine erfolgreiche Freigabe.
+        if (result.Success || result.Error == LicenseApiError.InvalidKey)
+        {
+            RemoveLocally();
+            return LicenseApiError.None;
+        }
+
+        return result.Error == LicenseApiError.None ? LicenseApiError.Network : result.Error;
+    }
+
+    /// <summary>
+    /// Entfernt Lizenz-Token und Modul-DLL NUR lokal (ohne Server-Kontakt) – der Geräte-Slot
+    /// bleibt beim Server belegt. Fallback, wenn der Lizenzserver nicht erreichbar ist.
+    /// Das bereits geladene Assembly bleibt im Prozess (Default-ALC kann nicht entladen),
+    /// wird aber durch <see cref="IsPremium"/>/<see cref="HasFeature"/> sofort wirkungslos.
+    /// </summary>
+    public void RemoveLocally()
+    {
+        try
+        {
+            if (File.Exists(ModulePath)) File.Delete(ModulePath);
+        }
+        catch
+        {
+            // DLL evtl. geladen/gesperrt -> der Lizenzentzug wirkt trotzdem.
+        }
+
+        LicenseService.Instance.RemoveLicense(); // löst Changed aus (auch hier)
+    }
+
     /// <summary>Speichert heruntergeladene Modul-Bytes an den festen Modulpfad.</summary>
     public static bool TrySaveModule(byte[] bytes)
     {
