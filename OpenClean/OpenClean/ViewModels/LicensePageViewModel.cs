@@ -14,7 +14,7 @@ namespace OpenClean.ViewModels;
 public sealed class LicensePageViewModel : ViewModelBase
 {
     private bool _isBusy;
-    private string _statusText = "";
+    private string? _statusKey;
 
     public RelayCommand ActivateCommand { get; }
     public RelayCommand BuyCommand { get; }
@@ -85,10 +85,14 @@ public sealed class LicensePageViewModel : ViewModelBase
         }
     }
 
-    public string StatusText
+    /// <summary>Zuletzt gesetzter Status-Text, abgeleitet vom gemerkten Loc-Schlüssel (sprachwechsel-fest).</summary>
+    public string StatusText => _statusKey is null ? "" : Loc.T(_statusKey);
+
+    /// <summary>Setzt den Status anhand eines Loc-Schlüssels und meldet die Änderung.</summary>
+    private void SetStatus(string? locKey)
     {
-        get => _statusText;
-        private set => SetProperty(ref _statusText, value);
+        _statusKey = locKey;
+        OnPropertyChanged(nameof(StatusText));
     }
 
     /// <summary>Öffnet den bestehenden Aktivierungsdialog (Schlüssel-Eingabe + Modul-Download).</summary>
@@ -114,7 +118,7 @@ public sealed class LicensePageViewModel : ViewModelBase
         if (!confirmed) return;
 
         IsBusy = true;
-        StatusText = Loc.T("license.deactivate.working");
+        SetStatus("license.deactivate.working");
 
         var error = await PremiumService.Instance.DeactivateAsync();
 
@@ -122,7 +126,7 @@ public sealed class LicensePageViewModel : ViewModelBase
 
         if (error == LicenseApiError.None)
         {
-            StatusText = Loc.T("license.deactivate.success");
+            SetStatus("license.deactivate.success");
             Refresh();
             return;
         }
@@ -138,13 +142,13 @@ public sealed class LicensePageViewModel : ViewModelBase
             if (localOnly)
             {
                 PremiumService.Instance.RemoveLocally();
-                StatusText = Loc.T("license.deactivate.success");
+                SetStatus("license.deactivate.success");
                 Refresh();
                 return;
             }
         }
 
-        StatusText = Loc.T("license.deactivate.error");
+        SetStatus("license.deactivate.error");
     }
 
     /// <summary>Zeigt nur die letzte Schlüsselgruppe; der Rest wird maskiert.</summary>
@@ -153,7 +157,12 @@ public sealed class LicensePageViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(key)) return "—";
 
         int dash = key.LastIndexOf('-');
-        string tail = dash >= 0 && dash < key.Length - 1 ? key[(dash + 1)..] : key;
+        // Regulärer Schlüssel (OPENCLEAN-XXXX-XXXX-XXXX-XXXX): letzte Gruppe im Klartext.
+        // Sonderfall ohne (nutzbaren) Bindestrich: nie den ganzen Schlüssel zeigen,
+        // sondern höchstens die letzten 4 Zeichen als Klartext-Rest.
+        string tail = dash >= 0 && dash < key.Length - 1
+            ? key[(dash + 1)..]
+            : key.Length > 4 ? key[^4..] : key;
         return $"OPENCLEAN-••••-••••-••••-{tail}";
     }
 
@@ -174,6 +183,14 @@ public sealed class LicensePageViewModel : ViewModelBase
         DeactivateCommand.RaiseCanExecuteChanged();
     }
 
-    /// <summary>Aktualisiert nach einem Sprachwechsel alle berechneten Texte.</summary>
-    public void Relocalize() => Refresh();
+    /// <summary>
+    /// Aktualisiert nach einem Sprachwechsel alle berechneten Texte. StatusText ist kein
+    /// berechneter, sondern ein gespeicherter Text – daher zusätzlich explizit neu melden,
+    /// damit er anhand des gemerkten Loc-Schlüssels in der neuen Sprache neu übersetzt wird.
+    /// </summary>
+    public void Relocalize()
+    {
+        Refresh();
+        OnPropertyChanged(nameof(StatusText));
+    }
 }
