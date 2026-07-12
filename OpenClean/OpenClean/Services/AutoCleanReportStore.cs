@@ -98,6 +98,48 @@ public sealed class AutoCleanReportStore
         }
     }
 
+    /// <summary>
+    /// Löscht einen einzelnen Bericht aus der JSON-Historie (Treffer über den Zeitstempel).
+    /// Das Textprotokoll bleibt unberührt – es ist zeilenbasiert und einem Eintrag nicht
+    /// eindeutig zuzuordnen. Liefert false, wenn nichts gelöscht wurde.
+    /// </summary>
+    public bool Delete(AutoCleanReport report)
+    {
+        try
+        {
+            var history = new List<AutoCleanReport>(Load());
+            int index = history.FindIndex(r => r.Timestamp == report.Timestamp);
+            if (index < 0) return false;
+
+            history.RemoveAt(index);
+            EnsureDir(JsonPath);
+            File.WriteAllText(JsonPath, JsonSerializer.Serialize(history, JsonOptions));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Löscht die gesamte Berichts-Historie UND das Textprotokoll. Nicht vorhandene
+    /// Dateien sind kein Fehler (nichts zu löschen = Erfolg).
+    /// </summary>
+    public bool ClearAll()
+    {
+        try
+        {
+            if (File.Exists(JsonPath)) File.Delete(JsonPath);
+            if (File.Exists(LogPath)) File.Delete(LogPath);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void SaveJson(AutoCleanReport report, int maxReports)
     {
         try
