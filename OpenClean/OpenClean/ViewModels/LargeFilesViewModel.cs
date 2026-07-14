@@ -181,6 +181,8 @@ public sealed class LargeFilesViewModel : ViewModelBase
             IsBusy = false;
             ScanProgressText = "";
             StatusText = Loc.T("storage.canceled");
+            RaiseListState();
+            RefreshSelectionState();
             return;
         }
 

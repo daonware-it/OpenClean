@@ -94,24 +94,11 @@
                              Converter={StaticResource BoolToVis}}" />
         </Grid>
 
-        <!-- ===== Status + progress bar ===== -->
+        <!-- ===== Status + progress bar (Kategorien-Tab) ===== -->
         <Border Grid.Row="3" Background="{DynamicResource BgDeepBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
-                Margin="-32,14,-32,0" Padding="32,12">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="DataContext"
-                            Value="{Binding RelativeSource={RelativeSource AncestorType=UserControl},
-                                    Path=DataContext}" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsLargeFilesTab}" Value="True">
-                            <Setter Property="DataContext"
-                                    Value="{Binding LargeFiles,
-                                            RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
+                Margin="-32,14,-32,0" Padding="32,12"
+                Visibility="{Binding IsCategoriesTab, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <!-- Live-Fortschritt der Analyse: aktueller Pfad + Prozent + Restzeit -->
                 <Grid Margin="0,0,0,8"
@@ -130,6 +117,40 @@
                                    VerticalAlignment="Center" Margin="12,0,0,0" />
                         <TextBlock Text="{Binding ScanEtaText}" Style="{StaticResource MutedText}"
                                    FontSize="12" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    </StackPanel>
+                </Grid>
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ScanProgressPercent, Mode=OneWay}"
+                             Height="6" Margin="0,0,0,8"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                           FontSize="12.5" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Status + progress bar (Große-Dateien-Tab) ===== -->
+        <Border Grid.Row="3" Background="{DynamicResource BgDeepBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
+                Margin="-32,14,-32,0" Padding="32,12"
+                DataContext="{Binding LargeFiles}"
+                Visibility="{Binding DataContext.IsLargeFilesTab,
+                             RelativeSource={RelativeSource AncestorType=UserControl},
+                             Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <!-- Live-Fortschritt der Datei-Suche: aktueller Pfad + Prozent (keine Restzeit) -->
+                <Grid Margin="0,0,0,8"
+                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding ScanProgressText}"
+                               Style="{StaticResource MutedText}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ScanProgressPercent, StringFormat={}{0:0} %}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,0,0" />
                     </StackPanel>
                 </Grid>
                 <ProgressBar Minimum="0" Maximum="100" Value="{Binding ScanProgressPercent, Mode=OneWay}"
