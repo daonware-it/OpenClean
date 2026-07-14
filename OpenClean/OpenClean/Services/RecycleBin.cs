@@ -63,6 +63,14 @@ public static class RecycleBin
         public string? lpszProgressTitle;
     }
 
+    // Kein Zeitlimit für das Verschieben in den Papierkorb (siehe MoveToRecycleBin):
+    // FOF_WANTNUKEWARNING kann auf eine MENSCHLICHE Antwort warten (Nuke-Warnung), und
+    // einen Menschen kann man nicht per Timeout "abbrechen" -- der Dialog bliebe offen,
+    // der Nutzer könnte Minuten später trotzdem auf "Ja" klicken und die Datei würde dann
+    // wirklich endgültig gelöscht, obwohl die App den Vorgang längst als fehlgeschlagen
+    // gemeldet hätte (gemeldeter Status weicht von der Realität ab). Bei Empty()/
+    // SHEmptyRecycleBin ist das anders: das kann OHNE jede Nutzerinteraktion blockieren,
+    // dort ist ein Zeitlimit also weiterhin richtig -- NICHT vereinheitlichen.
     private const uint FO_DELETE = 0x0003;
     private const ushort FOF_ALLOWUNDO = 0x0040;        // => Papierkorb statt hartem Löschen
     private const ushort FOF_NOCONFIRMATION = 0x0010;   // eigene Bestätigung ist schon erfolgt
@@ -81,8 +89,6 @@ public static class RecycleBin
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHFileOperation(ref SHFILEOPSTRUCT fileOp);
 
-    private const int MoveTimeoutMs = 60_000;
-
     /// <summary>
     /// Verschiebt die angegebenen Dateien in den Papierkorb (nicht hart löschen –
     /// ein Fehlgriff bleibt so umkehrbar).
@@ -94,17 +100,23 @@ public static class RecycleBin
     /// <para><b>Zu große Dateien für den Papierkorb:</b> Ist eine Datei größer als die für das
     /// Laufwerk konfigurierte Papierkorb-Quote, fragt Windows wegen <see cref="FOF_WANTNUKEWARNING"/>
     /// trotz <see cref="FOF_NOCONFIRMATION"/> nach, ob sie endgültig gelöscht werden soll. Deshalb
-    /// läuft die Operation je Datei auf einem eigenen STA-Thread mit Zeitlimit (gleiches Muster wie
-    /// <see cref="Empty"/>): SHFileOperation pumpt darin Nachrichten und kann den Dialog anzeigen.
-    /// Bricht der Nutzer ab, meldet <c>fAnyOperationsAborted</c> das korrekt als Fehlschlag; reagiert
-    /// er nicht innerhalb des Zeitlimits, gilt der Pfad ebenfalls als fehlgeschlagen (fail-safe:
-    /// kein Zeitüberschreiten in einen stillen Erfolg ummünzen).</para>
+    /// läuft die Operation je Datei auf einem eigenen STA-Thread (gleiches Muster wie <see cref="Empty"/>,
+    /// aber bewusst OHNE Zeitlimit – siehe Kommentar bei <see cref="FO_DELETE"/>): SHFileOperation pumpt
+    /// darin Nachrichten und kann den Dialog anzeigen. Bricht der Nutzer ab, meldet
+    /// <c>fAnyOperationsAborted</c> das korrekt als Fehlschlag.</para>
+    ///
+    /// <para><b>Eigentümerfenster:</b> <paramref name="ownerWindow"/> wird als <c>hwnd</c> an
+    /// <c>SHFILEOPSTRUCT</c> durchgereicht, damit ein eventueller Nuke-Warnungs-Dialog modal zum
+    /// Hauptfenster erscheint und nicht dahinter verschwinden kann. <see cref="RecycleBin"/> ist ein
+    /// reiner Service ohne WPF-Abhängigkeit – das Handle muss der Aufrufer (z. B. per
+    /// <c>WindowInteropHelper</c>) beschaffen und übergeben. Der Default <c>default(IntPtr)</c>
+    /// (kein Eigentümerfenster) funktioniert weiterhin.</para>
     ///
     /// <para><b>Pfadlänge:</b> <c>SHFileOperation</c> unterstützt keine Pfade über <c>MAX_PATH</c>
     /// (260 Zeichen). Solche Pfade schlagen bei der API fehl und landen dadurch automatisch in der
     /// <c>failed</c>-Liste – das ist beabsichtigtes Fail-safe-Verhalten, kein Bug.</para>
     /// </summary>
-    public static IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths)
+    public static IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths, IntPtr ownerWindow = default)
     {
         var failed = new List<string>();
 
@@ -117,10 +129,11 @@ public static class RecycleBin
 
                 // pFrom muss doppelt null-terminiert sein (die API erwartet eine Liste).
                 string capturedPath = path;
-                bool completed = RunSta(() =>
+                RunSta(() =>
                 {
                     var op = new SHFILEOPSTRUCT
                     {
+                        hwnd = ownerWindow,
                         wFunc = FO_DELETE,
                         pFrom = capturedPath + "\0\0",
                         fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_WANTNUKEWARNING
@@ -128,9 +141,9 @@ public static class RecycleBin
 
                     result = SHFileOperation(ref op);
                     aborted = op.fAnyOperationsAborted;
-                }, MoveTimeoutMs);
+                });
 
-                if (!completed || result != 0 || aborted)
+                if (result != 0 || aborted)
                     failed.Add(path);
             }
             catch
@@ -340,6 +353,34 @@ public static class RecycleBin
         if (captured is not null)
             throw captured;
         return true;
+    }
+
+    /// <summary>
+    /// Führt eine Shell-Aktion auf einem dedizierten STA-Thread aus und wartet UNBEGRENZT auf
+    /// deren Ende. Bewusst ohne Zeitlimit: wird für Operationen benutzt, die auf eine menschliche
+    /// Reaktion auf einen Windows-Dialog warten können (z. B. die Nuke-Warnung bei
+    /// <see cref="MoveToRecycleBin"/>) – ein Timeout würde hier nur den gemeldeten Status
+    /// verfälschen, ohne den Dialog tatsächlich zu schließen. Eine im Thread aufgetretene
+    /// Ausnahme wird im Aufrufer erneut geworfen.
+    /// </summary>
+    private static void RunSta(Action action)
+    {
+        Exception? captured = null;
+        var thread = new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { captured = ex; }
+        })
+        {
+            IsBackground = true,
+            Name = "RecycleBinShell"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (captured is not null)
+            throw captured;
     }
 
     private static long DirectorySize(string dir)
