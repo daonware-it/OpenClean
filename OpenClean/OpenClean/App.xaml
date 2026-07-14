@@ -511,6 +511,124 @@
                 </Setter>
             </Style>
 
+            <!-- ============ ComboBox (Standard, für alle ComboBoxen) ============ -->
+            <!-- Ohne diesen Style rendert eine ComboBox mit WPFs Standard-Chrome: im Dark-Theme
+                 heller Text auf hellem Grund, dadurch unlesbar. Gilt implizit (kein x:Key) für
+                 jede ComboBox in der App; einzelne Stellen können weiterhin gezielt einen
+                 anderen Style setzen (z. B. LanguageCombo). -->
+            <Style x:Key="DefaultComboBoxItem" TargetType="ComboBoxItem">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Padding" Value="12,9" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBoxItem">
+                            <Border x:Name="bd" Background="Transparent" CornerRadius="7"
+                                    Padding="{TemplateBinding Padding}" Margin="4,2">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ComboBox">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Height" Value="38" />
+                <Setter Property="Padding" Value="12,0" />
+                <Setter Property="ItemContainerStyle" Value="{StaticResource DefaultComboBoxItem}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBox">
+                            <Grid>
+                                <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="bd" Background="{DynamicResource SurfaceBrush}"
+                                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                    CornerRadius="10" Padding="{Binding Padding, RelativeSource={RelativeSource AncestorType=ComboBox}}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <!-- ContentTemplate/StringFormat mitgeben, sonst würde bei
+                                                         gesetztem DisplayMemberPath (z. B. Laufwerksauswahl) der
+                                                         ToString() des Objekts statt des Anzeigetexts erscheinen. -->
+                                                    <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
+                                                                      HorizontalAlignment="Left"
+                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                      ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                      ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                    <Path x:Name="arrow" Grid.Column="1" VerticalAlignment="Center"
+                                                          Data="M 0 0 L 5 5 L 10 0" Stretch="Uniform" Width="10" Height="6"
+                                                          Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.6"
+                                                          StrokeEndLineCap="Round" StrokeStartLineCap="Round"
+                                                          Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5" />
+                                                </Grid>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                    <Setter TargetName="arrow" Property="Stroke" Value="{DynamicResource AccentBrush}" />
+                                                    <Setter TargetName="arrow" Property="RenderTransform">
+                                                        <Setter.Value>
+                                                            <RotateTransform Angle="180" />
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+
+                                <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                       Focusable="False" PopupAnimation="Fade"
+                                       IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <Border Margin="0,6,0,0" CornerRadius="10" Padding="2"
+                                            Background="{DynamicResource BgRaisedBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                            MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270"
+                                                              Opacity="0.32" Color="#FF000000" />
+                                        </Border.Effect>
+                                        <ScrollViewer MaxHeight="280">
+                                            <ItemsPresenter />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.6" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- ============ ComboBox (Sprachauswahl) ============ -->
             <!-- Einzelnes Element im aufgeklappten Menü: Hover = Surface, ausgewählt =
                  Akzent-Soft-Fläche + Akzenttext + Häkchen. Passt zur NavButton-/CheckBox-Optik. -->
@@ -579,13 +697,9 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <!-- ContentTemplate/StringFormat mitgeben, sonst würde bei
-                                                         gesetztem DisplayMemberPath der ToString() des Objekts erscheinen. -->
                                                     <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
                                                                       HorizontalAlignment="Left"
-                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                                                      ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                                                      ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
                                                     <Path x:Name="arrow" Grid.Column="1" VerticalAlignment="Center"
                                                           Data="M 0 0 L 5 5 L 10 0" Stretch="Uniform" Width="10" Height="6"
                                                           Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.6"

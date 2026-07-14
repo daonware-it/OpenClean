@@ -125,7 +125,7 @@ public sealed class StorageAnalysisViewModel : ViewModelBase
         var drive = SelectedDrive;
         if (drive is null) return;
 
-        var result = await RunScanAsync(drive.Name, drive.TotalBytes);
+        var result = await RunScanAsync(drive.Name, drive.UsedBytes);
         if (result is null) return;
 
         _rootNode = result.Root;
