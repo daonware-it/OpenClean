@@ -10,10 +10,6 @@
              d:DesignHeight="700" d:DesignWidth="900"
              Background="{DynamicResource BgBrush}"
              FontFamily="{DynamicResource AppFont}">
-    <UserControl.Resources>
-        <local:FileNameConverter x:Key="FileName" />
-        <conv:PercentToStarConverter x:Key="PctStar" />
-    </UserControl.Resources>
     <Grid Margin="32,10,32,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -50,274 +46,72 @@
             </StackPanel>
         </Grid>
 
-        <!-- ===== Result + Summary banners ===== -->
-        <StackPanel Grid.Row="1">
-
-        <!-- Ergebnis-Banner nach dem Bereinigen -->
-        <Border Margin="0,22,0,0" Padding="20,14" CornerRadius="10"
-                Background="{DynamicResource AccentBrush}"
-                Visibility="{Binding HasReport, Converter={StaticResource BoolToVis}}">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
-                      Stroke="#FF10261F" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                <TextBlock Text="{Binding LastReportText}" Margin="14,0,0,0" VerticalAlignment="Center"
-                           Foreground="#FF10261F" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-
-        <!-- Auswahl-Zusammenfassung -->
-        <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18" ClipToBounds="True">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <!-- Dezenter Akzent-Glow -->
-                <Rectangle Grid.ColumnSpan="2" Margin="-22,-18" Fill="{DynamicResource HeroGlowBrush}"
-                           IsHitTestVisible="False" />
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="{loc:Loc cleaner.selectedLabel}" Style="{StaticResource MutedText}"
-                               FontSize="11.5" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding SelectionSummary}" FontSize="19" FontWeight="SemiBold"
-                               Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                </StackPanel>
-                <Border Grid.Column="1" Background="{DynamicResource BgDeepBrush}" CornerRadius="8"
-                        Padding="18,12" VerticalAlignment="Center">
-                    <StackPanel>
-                        <TextBlock Text="{loc:Loc cleaner.objects}" Style="{StaticResource MutedText}" FontSize="11"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="{Binding SelectedCount}" FontSize="24" FontWeight="Bold"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
+        <!-- ===== Tab-Leiste ===== -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,20,0,0">
+            <Button Content="{loc:Loc largefiles.categoriesTab}"
+                    Command="{Binding ShowCategoriesCommand}"
+                    Padding="16,8" FontSize="13" FontWeight="SemiBold" Cursor="Hand"
+                    BorderThickness="0,0,0,2" Background="Transparent">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCategoriesTab}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc largefiles.tab}"
+                    Command="{Binding ShowLargeFilesCommand}"
+                    Padding="16,8" FontSize="13" FontWeight="SemiBold" Cursor="Hand"
+                    BorderThickness="0,0,0,2" Background="Transparent" Margin="8,0,0,0">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsLargeFilesTab}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
         </StackPanel>
 
-        <!-- ===== Categories + preview ===== -->
-        <Grid Grid.Row="2" Margin="0,18,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <!-- Auswahl-Werkzeuge über der Kategorie-Liste -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
-                        Margin="0,0,8,10">
-                <Button Content="{loc:Loc common.selectAll}" Style="{StaticResource SecondaryButton}"
-                        Padding="12,6" FontSize="12.5"
-                        Command="{Binding SelectAllCommand}" />
-                <Button Content="{loc:Loc common.deselectAll}" Style="{StaticResource SecondaryButton}"
-                        Padding="12,6" FontSize="12.5" Margin="10,0,0,0"
-                        Command="{Binding DeselectAllCommand}" />
-            </StackPanel>
-
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                          Padding="0,0,8,0">
-            <ItemsControl ItemsSource="{Binding Categories}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Expander Margin="0,0,0,12" IsExpanded="False">
-                            <Expander.Header>
-                                <Grid VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <!-- Kategorie in Analyse einbeziehen -->
-                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
-                                              VerticalAlignment="Center" Margin="0,0,14,0"
-                                              ToolTip="{loc:Loc common.includeInAnalysis}" />
-                                    <!-- Icon-Chip: echtes Programm-Icon (Browser) oder farbiger Vektor -->
-                                    <Border Grid.Column="1" Width="42" Height="42" CornerRadius="12"
-                                            VerticalAlignment="Center" Margin="0,0,14,0">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="{Binding ChipBackground}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasIconImage}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource BgDeepBrush}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <Grid>
-                                            <Path Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center" Fill="{Binding ChipForeground}" Data="{Binding IconGeometry}"
-                                                  Visibility="{Binding HasIconImage, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
-                                            <Image Source="{Binding IconImage}" Width="26" Height="26"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                                   Visibility="{Binding HasIconImage, Converter={StaticResource BoolToVis}}" />
-                                        </Grid>
-                                    </Border>
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold"
-                                                       VerticalAlignment="Center" />
-                                            <Border CornerRadius="6" Padding="7,1" Margin="9,0,0,0" VerticalAlignment="Center"
-                                                    Background="#26EAB308"
-                                                    Visibility="{Binding RequiresAdmin, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="ADMIN" FontSize="9.5" FontWeight="Bold"
-                                                           Foreground="{DynamicResource WarnBrush}" />
-                                            </Border>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}"
-                                                   FontSize="11.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <!-- Größe + Objekte + Auswahl-Balken -->
-                                    <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right"
-                                                Margin="0,0,4,0">
-                                        <TextBlock Text="{Binding SizeDisplay}" FontSize="15" FontWeight="Bold"
-                                                   FontFamily="{StaticResource MonoFont}" HorizontalAlignment="Right" />
-                                        <TextBlock Text="{Binding CountDisplay}" Style="{StaticResource MutedText}"
-                                                   FontSize="10.5" HorizontalAlignment="Right" Margin="0,2,0,0" />
-                                        <Border Height="4" CornerRadius="2" Background="{DynamicResource BgDeepBrush}"
-                                                Margin="0,6,0,0" Width="120" ClipToBounds="True">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="{Binding SelectedRatioPercent, Converter={StaticResource PctStar}}" />
-                                                    <ColumnDefinition Width="{Binding SelectedRatioPercent, Converter={StaticResource PctStar}, ConverterParameter=inv}" />
-                                                </Grid.ColumnDefinitions>
-                                                <Rectangle Grid.Column="0" Fill="{DynamicResource AccentBrush}" RadiusX="2" RadiusY="2" />
-                                            </Grid>
-                                        </Border>
-                                    </StackPanel>
-                                </Grid>
-                            </Expander.Header>
-
-                            <!-- Unterkategorien: je Gruppe ein eigenes, aufklappbares Panel mit
-                                 eigener (Tri-State-)Checkbox; darunter die virtualisierte Dateiliste. -->
-                            <Grid Margin="14,0,14,12">
-                                <TextBlock Text="{loc:Loc cleaner.emptyPreview}"
-                                           Style="{StaticResource MutedText}" Margin="34,10,0,10"
-                                           Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
-                                <ItemsControl ItemsSource="{Binding Subcategories}"
-                                              Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Expander Margin="0,0,0,8" IsExpanded="False"
-                                                      Background="{DynamicResource BgDeepBrush}">
-                                                <Expander.Header>
-                                                    <Grid VerticalAlignment="Center">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <!-- eigene Auswahl der Unterkategorie -->
-                                                        <CheckBox Grid.Column="0" IsChecked="{Binding AllSelected, Mode=TwoWay}"
-                                                                  IsThreeState="True" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding HeaderDisplay}"
-                                                                   FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                    </Grid>
-                                                </Expander.Header>
-
-                                                <!-- Virtualisierte Liste: nur sichtbare Zeilen werden erzeugt,
-                                                     damit das Aufklappen auch bei tausenden Einträgen sofort ist. -->
-                                                <Border Background="{DynamicResource BgDeepBrush}" CornerRadius="8" Margin="0,0,0,8">
-                                                    <ListBox ItemsSource="{Binding Items}" MaxHeight="320"
-                                                             Background="Transparent" BorderThickness="0" Padding="6"
-                                                             HorizontalContentAlignment="Stretch"
-                                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                                             ScrollViewer.CanContentScroll="True"
-                                                             VirtualizingStackPanel.IsVirtualizing="True"
-                                                             VirtualizingStackPanel.VirtualizationMode="Recycling">
-                                                        <ListBox.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <VirtualizingStackPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ListBox.ItemsPanel>
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Padding" Value="0" />
-                                                                <Setter Property="Margin" Value="0,1" />
-                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                                <Setter Property="Background" Value="Transparent" />
-                                                                <Setter Property="Template">
-                                                                    <Setter.Value>
-                                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                                            <Border x:Name="row" Background="{TemplateBinding Background}"
-                                                                                    CornerRadius="6" Padding="10,7">
-                                                                                <ContentPresenter />
-                                                                            </Border>
-                                                                            <ControlTemplate.Triggers>
-                                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                                    <Setter TargetName="row" Property="Background"
-                                                                                            Value="{DynamicResource SurfaceHoverBrush}" />
-                                                                                </Trigger>
-                                                                            </ControlTemplate.Triggers>
-                                                                        </ControlTemplate>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Grid>
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                        <ColumnDefinition Width="*" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                                              VerticalAlignment="Center" />
-                                                                    <!-- Ordner-Icon -->
-                                                                    <Path Grid.Column="1" Width="16" Height="16" Stretch="Uniform"
-                                                                          Margin="12,0,12,0" VerticalAlignment="Center"
-                                                                          Fill="{DynamicResource AccentBrush}"
-                                                                          Data="M2 4 L8 4 L10 6 L20 6 L20 18 L2 18 Z"
-                                                                          Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVis}}" />
-                                                                    <!-- Datei-Icon -->
-                                                                    <Path Grid.Column="1" Width="14" Height="16" Stretch="Uniform"
-                                                                          Margin="12,0,12,0" VerticalAlignment="Center"
-                                                                          Fill="{DynamicResource TextMutedBrush}"
-                                                                          Data="M4 2 L13 2 L18 7 L18 20 L4 20 Z M13 2 L13 7 L18 7"
-                                                                          Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
-                                                                    <!-- Name (fett) + vollständiger Pfad (gedimmt) -->
-                                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                                        <TextBlock Text="{Binding FullPath, Converter={StaticResource FileName}}"
-                                                                                   FontSize="13" FontWeight="SemiBold"
-                                                                                   TextTrimming="CharacterEllipsis"
-                                                                                   ToolTip="{Binding FullPath}" />
-                                                                        <TextBlock Text="{Binding FullPath}"
-                                                                                   Foreground="{DynamicResource TextMutedBrush}"
-                                                                                   FontSize="11" Margin="0,1,0,0"
-                                                                                   TextTrimming="CharacterEllipsis"
-                                                                                   ToolTip="{Binding FullPath}" />
-                                                                    </StackPanel>
-                                                                    <TextBlock Grid.Column="3" Text="{Binding SizeDisplay}"
-                                                                               VerticalAlignment="Center" FontSize="12.5"
-                                                                               Foreground="{DynamicResource TextMutedBrush}"
-                                                                               Margin="16,0,4,0" MinWidth="72"
-                                                                               TextAlignment="Right" />
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </Border>
-                                            </Expander>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
-                        </Expander>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            </ScrollViewer>
+        <!-- ===== Inhalt: je nach Tab ===== -->
+        <Grid Grid.Row="2" Margin="0,4,0,0">
+            <local:CleanupCategoriesView
+                Visibility="{Binding IsCategoriesTab, Converter={StaticResource BoolToVis}}" />
+            <local:LargeFilesView DataContext="{Binding LargeFiles}"
+                Visibility="{Binding DataContext.IsLargeFilesTab,
+                             RelativeSource={RelativeSource AncestorType=UserControl},
+                             Converter={StaticResource BoolToVis}}" />
         </Grid>
 
         <!-- ===== Status + progress bar ===== -->
         <Border Grid.Row="3" Background="{DynamicResource BgDeepBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
                 Margin="-32,14,-32,0" Padding="32,12">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="DataContext"
+                            Value="{Binding RelativeSource={RelativeSource AncestorType=UserControl},
+                                    Path=DataContext}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsLargeFilesTab}" Value="True">
+                            <Setter Property="DataContext"
+                                    Value="{Binding LargeFiles,
+                                            RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <StackPanel>
                 <!-- Live-Fortschritt der Analyse: aktueller Pfad + Prozent + Restzeit -->
                 <Grid Margin="0,0,0,8"

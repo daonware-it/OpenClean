@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -20,6 +21,7 @@ public sealed class CleanerViewModel : ViewModelBase
     private bool _suppressSelectionCallback;
     private string _statusText = Loc.T("cleaner.status.ready");
     private bool _isBusy;
+    private bool _isLargeFilesTab;
 
     private double _scanProgressPercent;
     private string _scanProgressText = "";
@@ -30,10 +32,15 @@ public sealed class CleanerViewModel : ViewModelBase
 
     public ObservableCollection<CleanupCategory> Categories { get; } = new();
 
+    /// <summary>Untergeordnetes ViewModel des Große-Dateien-Tabs.</summary>
+    public LargeFilesViewModel LargeFiles { get; } = new();
+
     public AsyncRelayCommand ScanCommand { get; }
     public AsyncRelayCommand CleanCommand { get; }
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand DeselectAllCommand { get; }
+    public RelayCommand ShowCategoriesCommand { get; private set; } = null!;
+    public RelayCommand ShowLargeFilesCommand { get; private set; } = null!;
 
     public CleanerViewModel()
     {
@@ -51,7 +58,23 @@ public sealed class CleanerViewModel : ViewModelBase
         CleanCommand = new AsyncRelayCommand(_ => CleanAsync(), _ => CanClean);
         SelectAllCommand = new RelayCommand(_ => SetAllSelection(true), _ => CanChangeSelection);
         DeselectAllCommand = new RelayCommand(_ => SetAllSelection(false), _ => CanChangeSelection);
+        ShowCategoriesCommand = new RelayCommand(_ => IsLargeFilesTab = false);
+        ShowLargeFilesCommand = new RelayCommand(_ => IsLargeFilesTab = true);
     }
+
+    /// <summary>True, wenn der Große-Dateien-Tab aktiv ist.</summary>
+    public bool IsLargeFilesTab
+    {
+        get => _isLargeFilesTab;
+        set
+        {
+            if (SetProperty(ref _isLargeFilesTab, value))
+                OnPropertyChanged(nameof(IsCategoriesTab));
+        }
+    }
+
+    /// <summary>True, wenn der Kategorien-Tab aktiv ist (Gegenstück für die Sichtbarkeit).</summary>
+    public bool IsCategoriesTab => !_isLargeFilesTab;
 
     /// <summary>Auswahl-Buttons nur sinnvoll, wenn es nach einem Scan überhaupt Items gibt.</summary>
     public bool CanChangeSelection => !IsBusy && Categories.Any(c => c.Items.Count > 0);
@@ -136,7 +159,9 @@ public sealed class CleanerViewModel : ViewModelBase
         private set => SetProperty(ref _hasReport, value);
     }
 
-    public bool CanClean => _hasScanned && !IsBusy && SelectedCount > 0;
+    // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) bleibt der Scan nutzbar,
+    // der Bereinigen-Knopf aber deaktiviert. CleanerService sperrt zusätzlich selbst.
+    public bool CanClean => _hasScanned && !IsBusy && SelectedCount > 0 && !IntegrityState.IsBlocked;
 
     public long TotalSelectedBytes => Categories.Sum(c => c.SelectedBytes);
     public int SelectedCount => Categories.Sum(c => c.SelectedCount);
@@ -295,5 +320,6 @@ public sealed class CleanerViewModel : ViewModelBase
             category.RefreshLabels();
         if (!IsBusy && !_hasScanned)
             StatusText = Loc.T("cleaner.status.ready");
+        LargeFiles.Relocalize();
     }
 }
