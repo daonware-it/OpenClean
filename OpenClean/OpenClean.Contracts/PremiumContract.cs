@@ -56,6 +56,23 @@ public interface IPremiumSection
     FrameworkElement CreateView();
 }
 
+/// <summary>
+/// Fähigkeit: führt den unbeaufsichtigten geplanten Reinigungslauf (<c>--auto</c>) AUS.
+/// Bewusst separat von <see cref="IPremiumModule"/>: Die gesamte Ausführungslogik liegt
+/// ausschließlich im geschlossenen Modul – die offene App delegiert nur. Ohne geladenes,
+/// signiertes und lizenzgebundenes Modul existiert schlicht kein Codepfad, der die geplante
+/// Reinigung durchführt (Anti-Bypass: ein Patch der offenen Quelle findet nichts auszuführen).
+/// </summary>
+public interface IScheduledCleanupRunner
+{
+    /// <summary>
+    /// Prüft Lizenz, Feature und Einstellungen SELBST, scannt, löscht, schreibt den Bericht
+    /// und benachrichtigt. Liefert <c>true</c>, wenn ein Lauf ausgeführt wurde;
+    /// <c>false</c>, wenn er abgelehnt wurde (keine gültige Lizenz bzw. Zeitplan-Feature).
+    /// </summary>
+    bool RunScheduledCleanup();
+}
+
 /// <summary>Einstiegspunkt des Premium-Moduls; genau eine öffentliche Implementierung pro Modul.</summary>
 public interface IPremiumModule
 {

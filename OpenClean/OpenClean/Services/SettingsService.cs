@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OpenClean.Models;
 
 namespace OpenClean.Services;
 
@@ -28,12 +29,18 @@ public sealed class AppSettings
     public ScheduleSettings Schedule { get; set; } = new();
 
     /// <summary>
-    /// Grandfathering (v0.12.0): true, wenn diese Installation die geplante Reinigung
-    /// bereits vor der Premium-Einführung aktiv nutzte – der Alt-Zeitplan läuft dann ohne
-    /// Lizenz weiter. null = Migration noch nicht gelaufen (wird beim ersten UI-Start
-    /// einmalig ermittelt und gesetzt).
+    /// Sunset-Marker: true, sobald der einmalige Grandfathering-Sunset gelaufen ist (eine
+    /// evtl. noch aus v0.11 laufende Alt-Aufgabe wurde ohne Lizenz entfernt). Verhindert,
+    /// dass der Hinweis bei jedem Start erneut erscheint. Die geplante Reinigung erfordert
+    /// seit dem Sunset durchgehend eine gültige Zeitplan-Lizenz.
     /// </summary>
-    public bool? ScheduleGrandfathered { get; set; }
+    public bool? ScheduleSunsetDone { get; set; }
+
+    /// <summary>
+    /// Autostart-Einträge, deren Start OpenClean verzögert (v1.2.0). Leer, solange keine
+    /// Verzögerung eingerichtet ist; jeder Datensatz entspricht genau einer geplanten Aufgabe.
+    /// </summary>
+    public List<DelayedStartupItem> DelayedStartup { get; set; } = new();
 }
 
 /// <summary>

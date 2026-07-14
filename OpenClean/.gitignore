@@ -134,3 +134,6 @@ $RECYCLE.BIN/
 # Repos). Falls dennoch eine lokale settings-Datei im Projektbaum landet, nicht committen.
 settings.local.json
 **/settings.local.json
+
+## Interne Design-Specs / Brainstorming-Doku (nur lokal, nie auf GitHub)
+docs/superpowers/

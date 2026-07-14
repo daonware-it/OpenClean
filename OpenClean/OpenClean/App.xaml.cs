@@ -1,6 +1,7 @@
 using System.Windows;
 using OpenClean.Contracts;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
 using OpenClean.Services.Localization;
 
@@ -14,6 +15,28 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Selbstprüfung (OPCL-20) als Allererstes: Ist die eigene EXE unverändert und von
+        // DaonWare signiert? Muss VOR dem --auto-Zweig laufen (der löscht unbeaufsichtigt mit
+        // Adminrechten) und vor dem Hauptfenster, weil die ViewModels den Zustand beim Erzeugen
+        // auslesen – RelayCommand fragt CanExecute nicht selbsttätig erneut ab.
+        var integrity = IntegrityGuard.Initialize();
+
+        // Fremde oder nicht vertrauenswürdig signierte Binärdatei: nicht weiterlaufen.
+        // Im unbeaufsichtigten Lauf ohne Dialog (der würde ewig hängen bleiben).
+        if (integrity == IntegrityAction.Block)
+        {
+            LocalizationManager.Instance.InitializeStartupLanguage();
+            if (!IsAutoRun(e.Args))
+            {
+                MessageBox.Show(
+                    Loc.T("integrity.dialog.body"),
+                    Loc.T("integrity.dialog.title"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            Shutdown();
+            return;
+        }
 
         // Unbeaufsichtigter Lauf der geplanten Reinigung: erkennt den --auto-Schalter
         // (vom Windows-Aufgabenplaner gesetzt). Läuft KOMPLETT OHNE Fenster, reinigt
@@ -32,9 +55,10 @@ public partial class App : Application
         // bevor das Hauptfenster gerendert wird.
         LocalizationManager.Instance.InitializeStartupLanguage();
 
-        // Einmalige Grandfathering-Migration (v0.12.0): Installationen, die die geplante
-        // Reinigung schon vor der Premium-Einführung nutzten, behalten ihren Zeitplan.
-        MigrateScheduleGrandfathering();
+        // Einmaliger Grandfathering-Sunset: die geplante Reinigung erfordert jetzt durchgehend
+        // eine gültige Lizenz. Eine noch aus v0.11 laufende Alt-Aufgabe wird ohne Lizenz sauber
+        // entfernt (statt still ins Leere zu feuern) und der Nutzer einmalig informiert.
+        SunsetLegacySchedule();
 
         // Beim Start das gespeicherte Theme (settings.json) anwenden, sonst das
         // Windows-App-Modus-Theme (Hell/Dunkel) – bevor das Hauptfenster gerendert wird.
@@ -58,16 +82,24 @@ public partial class App : Application
             a.Equals("/auto", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Führt die geplante Reinigung anhand der gespeicherten Einstellungen aus, speichert
-    /// den Bericht und zeigt – falls aktiviert – eine Windows-Benachrichtigung. Jeder
-    /// Schritt ist gekapselt, damit ein Teilfehler den Lauf nicht abbricht.
+    /// Führt die geplante Reinigung aus – ausschließlich durch DELEGATION an das signierte
+    /// Premium-Modul. Die eigentliche Ausführungslogik existiert nur im geschlossenen
+    /// <c>OpenClean.Premium.dll</c>; die offene App kennt sie nicht. Ohne geladenes, gültig
+    /// lizenziertes Modul passiert daher NICHTS – aber nie stillschweigend (Toast + Protokoll).
+    /// Jeder Schritt ist gekapselt, damit ein Teilfehler den Lauf nicht abbricht.
     /// </summary>
     private static void RunAutomaticCleanup()
     {
         try
         {
-            var settings = SettingsService.Instance.Current;
-            var schedule = settings.Schedule;
+            // Manipulierte Binärdatei: NICHT unbeaufsichtigt mit Adminrechten löschen.
+            // Nie stillschweigend – Protokolleintrag und Benachrichtigung wie beim Lizenz-Stopp.
+            if (IntegrityState.IsBlocked)
+            {
+                new AutoCleanReportStore().LogSkippedRun(Loc.T("integrity.auto.skipped"), DateTime.Now);
+                new ToastService().Show(Loc.T("schedule.toast.title"), Loc.T("integrity.auto.skipped"));
+                return;
+            }
 
             // Online-Lizenzprüfung auch im unbeaufsichtigten Lauf: erkennt einen serverseitigen
             // Widerruf, bevor ohne gültige Lizenz gereinigt wird, und erneuert die Offline-Frist.
@@ -82,29 +114,18 @@ public partial class App : Application
             try { Task.Run(() => PremiumService.Instance.EnforceLicenseOnlineAsync()).GetAwaiter().GetResult(); }
             catch { /* Netzwerk-/Serverfehler dürfen den geplanten Lauf nie verhindern. */ }
 
-            // Premium-Prüfung (rein offline über das signierte Lizenz-Token): ohne Lizenz
-            // und ohne Grandfathering wird NICHT gereinigt – aber nie stillschweigend:
-            // Toast + Protokolleintrag, die geplante Aufgabe bleibt bestehen (der Nutzer
-            // entfernt sie bewusst über den gesperrten Zeitplan-Bereich).
-            if (!IsScheduledCleanupAllowed(settings))
+            // Delegation an das Modul: Es verifiziert Lizenz + Zeitplan-Feature selbst, scannt,
+            // löscht, schreibt den Bericht und benachrichtigt. Kein Modul (keine gültige Lizenz)
+            // ODER Ablehnung -> kein Lauf, aber Toast + Protokoll. Ein bloßer Patch der offenen
+            // Quelle nützt nichts: Es gibt hier keinen Ausführungscode, den man freischalten könnte.
+            if (PremiumService.Instance.Module is not IScheduledCleanupRunner runner ||
+                !runner.RunScheduledCleanup())
             {
                 new AutoCleanReportStore().LogSkippedRun(
                     Loc.T("schedule.auto.skippedNoLicense"), DateTime.Now);
                 new ToastService().Show(
                     Loc.T("schedule.toast.title"),
                     Loc.T("schedule.auto.skippedNoLicense"));
-                return;
-            }
-
-            var result = new AutoCleanService().Run(schedule);
-            var report = new AutoCleanReportStore().Add(schedule, result, DateTime.Now);
-
-            if (schedule.Notify)
-            {
-                string title = Loc.T("schedule.toast.title");
-                string message = Loc.T("schedule.toast.body",
-                    report.DeletedCount, ByteFormatter.Format(report.FreedBytes));
-                new ToastService().Show(title, message);
             }
         }
         catch
@@ -114,26 +135,32 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// True, wenn der geplante Lauf ausgeführt werden darf: gültige Premium-Lizenz mit
-    /// Zeitplan-Feature ODER Grandfathering (Bestandsnutzer aus v0.11; solange die
-    /// Migration noch nicht lief, zählt ein aktivierter Alt-Zeitplan ebenfalls).
+    /// Einmaliger Grandfathering-Sunset (nach v1.x): Die geplante Reinigung erfordert jetzt
+    /// durchgehend eine gültige Zeitplan-Lizenz. Läuft noch eine Alt-Aufgabe aus v0.11 ohne
+    /// Lizenz, wird sie hier deregistriert (statt bei jedem Lauf still ins Leere zu feuern)
+    /// und der Nutzer einmalig informiert. Lizenzierte Nutzer sind nicht betroffen.
     /// </summary>
-    private static bool IsScheduledCleanupAllowed(AppSettings settings)
-        => LicenseService.Instance.HasFeature(PremiumContract.FeatureSchedule) ||
-           settings.ScheduleGrandfathered == true ||
-           (settings.ScheduleGrandfathered is null && settings.Schedule.Enabled);
-
-    /// <summary>
-    /// Setzt das Grandfathering-Flag einmalig: true, wenn die geplante Reinigung vor dem
-    /// Update auf v0.12 bereits genutzt wurde (Einstellung aktiv oder Aufgabe registriert).
-    /// </summary>
-    private static void MigrateScheduleGrandfathering()
+    private static void SunsetLegacySchedule()
     {
         var settings = SettingsService.Instance.Current;
-        if (settings.ScheduleGrandfathered is not null) return;
+        if (settings.ScheduleSunsetDone == true) return;
 
-        bool legacy = settings.Schedule.Enabled || new ScheduleTaskService().IsRegistered();
-        settings.ScheduleGrandfathered = legacy;
+        // Nur eingreifen, wenn KEINE gültige Zeitplan-Lizenz vorliegt.
+        if (!LicenseService.Instance.HasFeature(PremiumContract.FeatureSchedule))
+        {
+            var taskService = new ScheduleTaskService();
+            bool hadLegacy = settings.Schedule.Enabled || taskService.IsRegistered();
+            if (hadLegacy)
+            {
+                taskService.Unregister();
+                settings.Schedule.Enabled = false;
+                new ToastService().Show(
+                    Loc.T("schedule.sunset.title"),
+                    Loc.T("schedule.sunset.body"));
+            }
+        }
+
+        settings.ScheduleSunsetDone = true;
         SettingsService.Instance.Save();
     }
 }
