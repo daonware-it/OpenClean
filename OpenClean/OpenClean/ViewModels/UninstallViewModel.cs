@@ -5,6 +5,7 @@ using System.Windows.Data;
 using OpenClean.Contracts;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
 using OpenClean.Views;
 
@@ -51,10 +52,12 @@ public sealed class UninstallViewModel : ViewModelBase
     public UninstallViewModel()
     {
         RefreshCommand = new AsyncRelayCommand(_ => LoadAsync(), _ => !IsBusy);
+        // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) sind Deinstallation
+        // und Reste-Löschen gesperrt; die Liste selbst bleibt einsehbar.
         UninstallSelectedCommand = new AsyncRelayCommand(_ => UninstallSelectedAsync(),
-            _ => !IsBusy && SelectedCount > 0);
+            _ => !IsBusy && SelectedCount > 0 && !IntegrityState.IsBlocked);
         RemoveLeftoversCommand = new AsyncRelayCommand(_ => RemoveLeftoversAsync(),
-            _ => !IsBusy && Leftovers.Any(l => l.IsSelected));
+            _ => !IsBusy && Leftovers.Any(l => l.IsSelected) && !IntegrityState.IsBlocked);
         IgnoreLeftoversCommand = new RelayCommand(_ => ClearLeftovers());
         // Klick auf „Größe": schaltet zwischen ab-/aufsteigend um, wenn schon aktiv;
         // sonst wird auf Größensortierung gewechselt (Richtung bleibt erhalten).
@@ -383,16 +386,41 @@ public sealed class UninstallViewModel : ViewModelBase
         ProgressIsIndeterminate = false;
         ProgressPercent = 0;
 
-        int done = 0;
-        var removedOk = new List<InstalledApp>();
-        foreach (var app in selected)
+        List<InstalledApp> removedOk;
+        if (selected.Count == 1)
         {
-            StatusText = Loc.T("uninstall.status.uninstallingBatch", done + 1, selected.Count, app.Name);
+            // Kostenlose Einzel-Deinstallation – bleibt bewusst in der offenen App.
+            var app = selected[0];
+            StatusText = Loc.T("uninstall.status.uninstallingBatch", 1, 1, app.Name);
             ProgressText = StatusText;
-            if (await _uninstaller.UninstallAsync(app, silent: true))
-                removedOk.Add(app);
-            done++;
-            ProgressPercent = done * 100.0 / selected.Count;
+            bool ok = await _uninstaller.UninstallAsync(app, silent: true);
+            ProgressPercent = 100;
+            removedOk = ok ? new List<InstalledApp> { app } : new List<InstalledApp>();
+        }
+        else
+        {
+            // Batch-Deinstallation (Premium): Die Schleife läuft ausschließlich im signierten
+            // Modul. Ohne geladenes, lizenziertes Modul existiert kein offener Codepfad, der
+            // mehrere Programme auf einmal entfernt – ein Patch der offenen Quelle findet nichts.
+            if (PremiumService.Instance.Module is not IBatchUninstallRunner runner)
+            {
+                IsBusy = false;
+                ProgressIsIndeterminate = true;
+                StatusText = Loc.T("premium.error.moduleLoad");
+                return;
+            }
+
+            var progress = new Progress<BatchUninstallProgress>(p =>
+            {
+                ProgressPercent = p.Total > 0 ? p.Done * 100.0 / p.Total : 0;
+                if (!string.IsNullOrEmpty(p.CurrentName))
+                {
+                    StatusText = Loc.T("uninstall.status.uninstallingBatch", p.Done + 1, p.Total, p.CurrentName);
+                    ProgressText = StatusText;
+                }
+            });
+
+            removedOk = (await runner.RunBatchUninstallAsync(selected, progress)).ToList();
         }
 
         // Auf das tatsächliche Entfernen warten (Deinstaller laufen oft asynchron weiter),
