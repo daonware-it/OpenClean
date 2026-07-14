@@ -560,5 +560,6 @@
   "largefiles.deletePartialBoth": "{0} moved, {1} failed, {2} protected (skipped)",
   "largefiles.openInExplorer": "Show in Explorer",
   "largefiles.protected": "Protected system path – will not be touched",
-  "largefiles.capped": "List limited to {0} matches – there may be more files."
+  "largefiles.capped": "List limited to {0} matches – there may be more files.",
+  "largefiles.deleteError": "The delete operation could not be completed: {0}"
 }

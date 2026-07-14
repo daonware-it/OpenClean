@@ -561,5 +561,6 @@
   "largefiles.deletePartialBoth": "{0} verschoben, {1} fehlgeschlagen, {2} geschützt übersprungen",
   "largefiles.openInExplorer": "Im Explorer anzeigen",
   "largefiles.protected": "Geschützter Systempfad – wird nicht angetastet",
-  "largefiles.capped": "Liste auf {0} Treffer begrenzt – es gibt möglicherweise mehr Dateien."
+  "largefiles.capped": "Liste auf {0} Treffer begrenzt – es gibt möglicherweise mehr Dateien.",
+  "largefiles.deleteError": "Der Löschvorgang konnte nicht abgeschlossen werden: {0}"
 }

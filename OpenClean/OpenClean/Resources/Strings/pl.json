@@ -560,5 +560,6 @@
   "largefiles.deletePartialBoth": "Przeniesiono {0}, nie powiodło się {1}, chronione (pominięte) {2}",
   "largefiles.openInExplorer": "Pokaż w Eksploratorze",
   "largefiles.protected": "Chroniona ścieżka systemowa – nie zostanie naruszona",
-  "largefiles.capped": "Lista ograniczona do {0} wyników – może być więcej plików."
+  "largefiles.capped": "Lista ograniczona do {0} wyników – może być więcej plików.",
+  "largefiles.deleteError": "Nie udało się zakończyć usuwania: {0}"
 }

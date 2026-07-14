@@ -250,7 +250,8 @@ public sealed class LargeFilesViewModel : ViewModelBase
         if (!confirmed) return;
 
         // Löschen selbst ist bewusst nicht abbrechbar (läuft schon in Windows) – CancelCommand
-        // darf trotz IsBusy nicht aktiv wirken, siehe RaiseCanExecuteChanged unten.
+        // darf trotz IsBusy nicht aktiv wirken, siehe dessen CanExecute im Konstruktor
+        // (IsBusy && !_isDeleting).
         _isDeleting = true;
         IsBusy = true;
         StatusText = "";
@@ -305,12 +306,24 @@ public sealed class LargeFilesViewModel : ViewModelBase
                 (0, > 0) => Loc.T("largefiles.deletePartialProtected", deletedCount, blockedCount),
                 _ => Loc.T("largefiles.deletePartialBoth", deletedCount, failedCount, blockedCount)
             };
-
-            RaiseListState();
-            RefreshSelectionState();
+        }
+        catch (Exception ex)
+        {
+            // Ohne diese Meldung sähe der Nutzer bei einer unerwarteten Ausnahme gar keine
+            // Rückmeldung – markierte Dateien blieben liegen und niemand wüsste, warum. Die
+            // Ausnahme wird nicht weitergeworfen: AsyncRelayCommand würde zwar zusätzlich eine
+            // MessageBox zeigen, aber die Statuszeile soll unabhängig davon stimmen.
+            StatusText = Loc.T("largefiles.deleteError", ex.Message);
         }
         finally
         {
+            // Auch im Fehlerfall muss der Listenzustand aktualisiert werden: Wurden vor der
+            // Ausnahme bereits Dateien aus "Files" entfernt, wären "HasResults"/"ShowEmptyHint"
+            // sonst veraltet. Im Erfolgsfall wurden beide Aufrufe oben entfernt, damit sie hier
+            // nicht doppelt laufen.
+            RaiseListState();
+            RefreshSelectionState();
+
             _isDeleting = false;
             IsBusy = false;
         }

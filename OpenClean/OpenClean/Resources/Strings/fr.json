@@ -560,5 +560,6 @@
   "largefiles.deletePartialBoth": "{0} déplacés, {1} échoués, {2} protégés (ignorés)",
   "largefiles.openInExplorer": "Afficher dans l'Explorateur",
   "largefiles.protected": "Chemin système protégé – ne sera pas modifié",
-  "largefiles.capped": "Liste limitée à {0} résultats – il pourrait y avoir plus de fichiers."
+  "largefiles.capped": "Liste limitée à {0} résultats – il pourrait y avoir plus de fichiers.",
+  "largefiles.deleteError": "La suppression n'a pas pu être terminée : {0}"
 }
