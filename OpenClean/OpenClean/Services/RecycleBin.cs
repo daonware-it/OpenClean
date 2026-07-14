@@ -48,6 +48,67 @@ public static class RecycleBin
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, RecycleFlags dwFlags);
 
+    // ---- In den Papierkorb verschieben (Große-Dateien-Finder) ---------------
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct SHFILEOPSTRUCT
+    {
+        public IntPtr hwnd;
+        public uint wFunc;
+        public string pFrom;
+        public string? pTo;
+        public ushort fFlags;
+        [MarshalAs(UnmanagedType.Bool)] public bool fAnyOperationsAborted;
+        public IntPtr hNameMappings;
+        public string? lpszProgressTitle;
+    }
+
+    private const uint FO_DELETE = 0x0003;
+    private const ushort FOF_ALLOWUNDO = 0x0040;        // => Papierkorb statt hartem Löschen
+    private const ushort FOF_NOCONFIRMATION = 0x0010;   // eigene Bestätigung ist schon erfolgt
+    private const ushort FOF_NOERRORUI = 0x0400;        // Fehler melden wir selbst, kein Windows-Dialog
+    private const ushort FOF_SILENT = 0x0004;
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHFileOperation(ref SHFILEOPSTRUCT fileOp);
+
+    /// <summary>
+    /// Verschiebt die angegebenen Dateien in den Papierkorb (nicht hart löschen –
+    /// ein Fehlgriff bleibt so umkehrbar).
+    ///
+    /// <para>Jede Datei wird einzeln übergeben: So scheitert nicht der ganze Stapel, wenn
+    /// eine Datei gesperrt ist. Zurück kommen genau die Pfade, die NICHT verschoben werden
+    /// konnten – die Oberfläche zeigt sie mit Fehlermarkierung weiter an.</para>
+    /// </summary>
+    public static IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths)
+    {
+        var failed = new List<string>();
+
+        foreach (string path in paths)
+        {
+            try
+            {
+                // pFrom muss doppelt null-terminiert sein (die API erwartet eine Liste).
+                var op = new SHFILEOPSTRUCT
+                {
+                    wFunc = FO_DELETE,
+                    pFrom = path + "\0\0",
+                    fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT
+                };
+
+                int result = SHFileOperation(ref op);
+                if (result != 0 || op.fAnyOperationsAborted)
+                    failed.Add(path);
+            }
+            catch
+            {
+                failed.Add(path);
+            }
+        }
+
+        return failed;
+    }
+
     // ---- Inhalt auflisten ---------------------------------------------------
 
     /// <summary>
