@@ -209,6 +209,123 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
+                <!-- ===== Belegungsanalyse (Sunburst) ===== -->
+                <TextBlock Text="{loc:Loc storage.heading}" Style="{StaticResource HeaderText}"
+                           FontSize="16" Margin="2,22,0,0" />
+                <TextBlock Text="{loc:Loc storage.subtitle}" Style="{StaticResource MutedText}"
+                           Margin="2,4,0,0" />
+
+                <Border Style="{StaticResource Card}" Padding="22" Margin="0,12,0,0"
+                        DataContext="{Binding DataContext.StorageAnalysis,
+                                      RelativeSource={RelativeSource AncestorType=Window}}">
+                    <StackPanel>
+
+                        <!-- Kopfzeile: Laufwerk + Analysieren/Abbrechen -->
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{loc:Loc storage.selectDrive}" Style="{StaticResource MutedText}"
+                                           VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <ComboBox ItemsSource="{Binding Drives}" SelectedItem="{Binding SelectedDrive}"
+                                          DisplayMemberPath="TitleDisplay" MinWidth="180"
+                                          VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button Content="{loc:Loc storage.cancel}" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding CancelCommand}"
+                                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                                <Button Content="{loc:Loc storage.analyze}" Style="{StaticResource PrimaryButton}"
+                                        Command="{Binding ScanCommand}" Margin="12,0,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Fortschritt -->
+                        <StackPanel Margin="0,16,0,0"
+                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding ScanProgressText}" Style="{StaticResource MutedText}"
+                                       FontSize="12" TextTrimming="CharacterEllipsis" />
+                            <ProgressBar Minimum="0" Maximum="100" Height="6" Margin="0,6,0,0"
+                                         Value="{Binding ScanProgressPercent, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <!-- Leerzustand -->
+                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                                   Margin="0,18,0,0" HorizontalAlignment="Center"
+                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVis},
+                                                ConverterParameter=invert}" />
+
+                        <!-- Diagramm + Seitenleiste -->
+                        <Grid Margin="0,18,0,0"
+                              Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <controls:SunburstChart Grid.Column="0" Width="360" Height="360"
+                                                    Root="{Binding CurrentNode}"
+                                                    DrillDownCommand="{Binding DrillDownCommand}"
+                                                    NavigateUpCommand="{Binding NavigateUpCommand}"
+                                                    TrackBrush="{DynamicResource BorderBrush}"
+                                                    OtherBrush="{DynamicResource BorderBrush}"
+                                                    StrokeBrush="{DynamicResource SurfaceBrush}"
+                                                    CenterTextBrush="{DynamicResource TextBrush}" />
+
+                            <StackPanel Grid.Column="1" Margin="24,4,0,0">
+                                <!-- Breadcrumb: jeder Knoten ist anklickbar -->
+                                <ItemsControl ItemsSource="{Binding Breadcrumb}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="{Binding Name}" Padding="6,2" FontSize="12.5"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource AccentBrush}" Cursor="Hand"
+                                                        Command="{Binding DataContext.NavigateToCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding}" />
+                                                <TextBlock Text="›" Style="{StaticResource MutedText}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="{loc:Loc storage.topFolders}" Style="{StaticResource HeaderText}"
+                                           FontSize="13" Margin="6,16,0,0" />
+
+                                <ItemsControl ItemsSource="{Binding TopFolders}" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Background="Transparent" BorderThickness="0" Padding="6,7"
+                                                    HorizontalContentAlignment="Stretch" Cursor="Hand"
+                                                    Command="{Binding DataContext.NavigateToCommand,
+                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Name}" FontSize="13"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding FullPath}" />
+                                                    <TextBlock Text="{Binding TotalBytes, Converter={StaticResource Bytes}}"
+                                                               HorizontalAlignment="Right" FontSize="12.5"
+                                                               FontFamily="{StaticResource MonoFont}"
+                                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="{loc:Loc storage.back}" Style="{StaticResource MutedText}"
+                                           FontSize="11.5" Margin="6,16,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
     </Grid>

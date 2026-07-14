@@ -18,6 +18,7 @@
             <!-- ============ Converters (shared, theme-independent) ============ -->
             <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
             <conv:ImpactToBrushConverter x:Key="ImpactToBrush" />
+            <conv:BytesConverter x:Key="Bytes" />
             <BooleanToVisibilityConverter x:Key="BuiltInBoolToVis" />
 
             <FontFamily x:Key="AppFont">Segoe UI Variable, Segoe UI</FontFamily>
@@ -578,9 +579,13 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
+                                                    <!-- ContentTemplate/StringFormat mitgeben, sonst würde bei
+                                                         gesetztem DisplayMemberPath der ToString() des Objekts erscheinen. -->
                                                     <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
                                                                       HorizontalAlignment="Left"
-                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                      ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                      ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
                                                     <Path x:Name="arrow" Grid.Column="1" VerticalAlignment="Center"
                                                           Data="M 0 0 L 5 5 L 10 0" Stretch="Uniform" Width="10" Height="6"
                                                           Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.6"

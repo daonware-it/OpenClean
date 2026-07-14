@@ -1,5 +1,6 @@
 using OpenClean.Contracts;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
 using OpenClean.Views;
 
@@ -43,6 +44,7 @@ public sealed class MainViewModel : ViewModelBase
     public DuplicatesViewModel Duplicates { get; } = new();
     public DashboardViewModel Dashboard { get; }
     public LicensePageViewModel License { get; } = new();
+    public StorageAnalysisViewModel StorageAnalysis { get; } = new();
 
     public MainViewModel()
     {
@@ -71,6 +73,7 @@ public sealed class MainViewModel : ViewModelBase
         Loc.LanguageChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(AppTagline));
+            OnPropertyChanged(nameof(IntegrityBannerText));
             Dashboard.Relocalize();
             Cleaner.Relocalize();
             Privacy.Relocalize();
@@ -81,8 +84,24 @@ public sealed class MainViewModel : ViewModelBase
             Uninstall.Relocalize();
             Duplicates.Relocalize();
             License.Relocalize();
+            StorageAnalysis.Relocalize();
         };
     }
+
+    // ---- Integrität (OPCL-20) ---------------------------------------------------------
+    // Der Zustand steht beim Erzeugen des ViewModels bereits fest (App.OnStartup prüft davor)
+    // und ändert sich danach nicht mehr – deshalb reine Nur-Lese-Eigenschaften ohne Ereignis.
+
+    /// <summary>True, wenn die Selbstprüfung angeschlagen hat: Banner einblenden.</summary>
+    public bool IsIntegrityDegraded => IntegrityState.IsDegraded;
+
+    /// <summary>True, wenn deswegen die ändernden Funktionen gesperrt sind.</summary>
+    public bool IsIntegrityBlocked => IntegrityState.IsBlocked;
+
+    /// <summary>Text des Integritäts-Banners.</summary>
+    public string IntegrityBannerText => IntegrityState.IsBlocked
+        ? Loc.T("integrity.banner.tampered")
+        : Loc.T("integrity.banner.unsigned");
 
     /// <summary>Aktiver Hauptbereich; steuert die Sichtbarkeit der Content-Views.</summary>
     public AppSection CurrentSection
