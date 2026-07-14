@@ -557,6 +557,8 @@
   "largefiles.deleted": "{0} Dateien in den Papierkorb verschoben · {1} freigegeben",
   "largefiles.deleteFailed": "Konnte nicht verschoben werden (gesperrt oder keine Rechte)",
   "largefiles.deletePartial": "{0} verschoben, {1} fehlgeschlagen",
+  "largefiles.deletePartialProtected": "{0} verschoben, {1} geschützt übersprungen",
+  "largefiles.deletePartialBoth": "{0} verschoben, {1} fehlgeschlagen, {2} geschützt übersprungen",
   "largefiles.openInExplorer": "Im Explorer anzeigen",
   "largefiles.protected": "Geschützter Systempfad – wird nicht angetastet",
   "largefiles.capped": "Liste auf {0} Treffer begrenzt – es gibt möglicherweise mehr Dateien."

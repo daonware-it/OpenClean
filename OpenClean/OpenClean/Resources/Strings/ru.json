@@ -556,6 +556,8 @@
   "largefiles.deleted": "Перемещено файлов в корзину: {0} · освобождено {1}",
   "largefiles.deleteFailed": "Не удалось переместить (заблокировано или нет прав)",
   "largefiles.deletePartial": "Перемещено {0}, не удалось {1}",
+  "largefiles.deletePartialProtected": "Перемещено {0}, защищено (пропущено) {1}",
+  "largefiles.deletePartialBoth": "Перемещено {0}, не удалось {1}, защищено (пропущено) {2}",
   "largefiles.openInExplorer": "Показать в проводнике",
   "largefiles.protected": "Защищённый системный путь — не будет затронут",
   "largefiles.capped": "Список ограничен {0} результатами — файлов может быть больше."

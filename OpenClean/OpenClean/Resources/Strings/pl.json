@@ -556,6 +556,8 @@
   "largefiles.deleted": "Przeniesiono {0} plików do kosza · zwolniono {1}",
   "largefiles.deleteFailed": "Nie można było przenieść (zablokowany lub brak uprawnień)",
   "largefiles.deletePartial": "Przeniesiono {0}, nie powiodło się {1}",
+  "largefiles.deletePartialProtected": "Przeniesiono {0}, chronione (pominięte) {1}",
+  "largefiles.deletePartialBoth": "Przeniesiono {0}, nie powiodło się {1}, chronione (pominięte) {2}",
   "largefiles.openInExplorer": "Pokaż w Eksploratorze",
   "largefiles.protected": "Chroniona ścieżka systemowa – nie zostanie naruszona",
   "largefiles.capped": "Lista ograniczona do {0} wyników – może być więcej plików."

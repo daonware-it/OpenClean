@@ -177,17 +177,26 @@ public sealed class StorageAnalysisViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// True, wenn <paramref name="node"/> selbst oder irgendein Nachfahre innerhalb des
-    /// bereits geladenen Teilbaums <see cref="FolderNode.IsPartial"/> ist. Da ein Scan immer
-    /// höchstens <see cref="Controls.SunburstChart.RingCount"/> Ebenen relativ zu seiner
-    /// eigenen Wurzel auflöst, reicht ein unbegrenzter Abstieg über <see cref="FolderNode.Children"/>
-    /// – abgeschnittene Knoten haben ohnehin keine Kinder mehr und beenden den Ast von selbst.
+    /// True, wenn <paramref name="node"/> selbst oder ein Nachfahre innerhalb der Ringe, die der
+    /// Sunburst tatsächlich zeichnet, <see cref="FolderNode.IsPartial"/> ist.
+    ///
+    /// <para>Ein frischer Scan markiert JEDEN Knoten auf Tiefe <c>MaxDepth</c>
+    /// (= <see cref="Controls.SunburstChart.RingCount"/>) als partiell, der noch Unterordner
+    /// hätte – das ist normal und harmlos, solange dieser Knoten außerhalb der sichtbaren Ringe
+    /// liegt. <see cref="Controls.SunburstChart.DrawLevel"/> bricht bei
+    /// <c>depth >= RingCount</c> ab, zeichnet also nur relative Tiefen 0..RingCount-1. Ein
+    /// unbegrenzter Abstieg würde daher nach jedem Scan für praktisch jeden Knoten (auch die
+    /// Wurzel) „true" liefern und bei jeder Rück-Navigation einen kompletten Neuscan auslösen.
+    /// Deshalb wird der Abstieg bei relativer Tiefe <c>RingCount - 1</c> gekappt: tiefer wird
+    /// ohnehin nichts mehr gezeichnet, ein dort liegender partieller Knoten kann also keine
+    /// Falschdarstellung verursachen.</para>
     /// </summary>
-    private static bool HasPartialDescendant(FolderNode node)
+    private static bool HasPartialDescendant(FolderNode node, int depth = 0)
     {
         if (node.IsPartial) return true;
+        if (depth >= Controls.SunburstChart.RingCount - 1) return false;   // tiefer wird nichts mehr gezeichnet
         foreach (var child in node.Children)
-            if (HasPartialDescendant(child)) return true;
+            if (HasPartialDescendant(child, depth + 1)) return true;
         return false;
     }
 

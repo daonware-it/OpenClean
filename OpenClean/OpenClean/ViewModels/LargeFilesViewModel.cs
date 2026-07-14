@@ -255,52 +255,65 @@ public sealed class LargeFilesViewModel : ViewModelBase
         IsBusy = true;
         StatusText = "";
 
-        // Dritte Verteidigungslinie: PathSafety entscheidet endgültig, was angefasst wird.
-        var deletable = selected.Where(f => PathSafety.IsDeletable(f.FullPath)).ToList();
-        var blocked = selected.Except(deletable).ToList();
-        foreach (var file in blocked)
-            file.MarkProtected();
-
-        var paths = deletable.Select(f => f.FullPath).ToList();
-
-        // Fensterhandle MUSS auf dem UI-Thread beschafft werden (vor dem Task.Run) – ein
-        // eventueller "zu groß für den Papierkorb"-Dialog soll modal zum Hauptfenster
-        // erscheinen. Der eigentliche Aufruf läuft im Hintergrund, weil er ohne Zeitlimit auf
-        // eine mögliche Nutzerbestätigung warten kann und den UI-Thread sonst einfrieren würde.
-        IntPtr ownerHandle = Application.Current?.MainWindow is { } mainWindow
-            ? new WindowInteropHelper(mainWindow).Handle
-            : IntPtr.Zero;
-        IReadOnlyList<string> failedPaths = await Task.Run(() => RecycleBin.MoveToRecycleBin(paths, ownerHandle));
-
-        var failed = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
-
-        long freedBytes = 0;
-        int deletedCount = 0;
-
-        foreach (var file in deletable)
+        try
         {
-            if (failed.Contains(file.FullPath))
+            // Dritte Verteidigungslinie: PathSafety entscheidet endgültig, was angefasst wird.
+            var deletable = selected.Where(f => PathSafety.IsDeletable(f.FullPath)).ToList();
+            var blocked = selected.Except(deletable).ToList();
+            foreach (var file in blocked)
+                file.MarkProtected();
+
+            var paths = deletable.Select(f => f.FullPath).ToList();
+
+            // Fensterhandle MUSS auf dem UI-Thread beschafft werden (vor dem Task.Run) – ein
+            // eventueller "zu groß für den Papierkorb"-Dialog soll modal zum Hauptfenster
+            // erscheinen. Der eigentliche Aufruf läuft im Hintergrund, weil er ohne Zeitlimit auf
+            // eine mögliche Nutzerbestätigung warten kann und den UI-Thread sonst einfrieren würde.
+            IntPtr ownerHandle = Application.Current?.MainWindow is { } mainWindow
+                ? new WindowInteropHelper(mainWindow).Handle
+                : IntPtr.Zero;
+            IReadOnlyList<string> failedPaths = await Task.Run(() => RecycleBin.MoveToRecycleBin(paths, ownerHandle));
+
+            var failed = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
+
+            long freedBytes = 0;
+            int deletedCount = 0;
+
+            foreach (var file in deletable)
             {
-                file.MarkFailed();
-                continue;
+                if (failed.Contains(file.FullPath))
+                {
+                    file.MarkFailed();
+                    continue;
+                }
+
+                freedBytes += file.SizeBytes;
+                deletedCount++;
+                Files.Remove(file);
             }
 
-            freedBytes += file.SizeBytes;
-            deletedCount++;
-            Files.Remove(file);
+            // Geschützte Dateien werden nie zum Löschen versucht – sie zählen deshalb nicht als
+            // "fehlgeschlagen" (das widerspräche der Liste, die sie schon als "Geschützter
+            // Systempfad" ausweist), sondern werden getrennt ausgewiesen.
+            int blockedCount = blocked.Count;
+            int failedCount = failed.Count;
+
+            StatusText = (failedCount, blockedCount) switch
+            {
+                (0, 0) => Loc.T("largefiles.deleted", deletedCount, ByteFormatter.Format(freedBytes)),
+                (> 0, 0) => Loc.T("largefiles.deletePartial", deletedCount, failedCount),
+                (0, > 0) => Loc.T("largefiles.deletePartialProtected", deletedCount, blockedCount),
+                _ => Loc.T("largefiles.deletePartialBoth", deletedCount, failedCount, blockedCount)
+            };
+
+            RaiseListState();
+            RefreshSelectionState();
         }
-
-        _isDeleting = false;
-        IsBusy = false;
-        CancelCommand.RaiseCanExecuteChanged();
-
-        int failedCount = failed.Count + blocked.Count;
-        StatusText = failedCount > 0
-            ? Loc.T("largefiles.deletePartial", deletedCount, failedCount)
-            : Loc.T("largefiles.deleted", deletedCount, ByteFormatter.Format(freedBytes));
-
-        RaiseListState();
-        RefreshSelectionState();
+        finally
+        {
+            _isDeleting = false;
+            IsBusy = false;
+        }
     }
 
     private void SetAllSelection(bool selected)

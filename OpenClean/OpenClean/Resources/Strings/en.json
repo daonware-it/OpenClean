@@ -556,6 +556,8 @@
   "largefiles.deleted": "{0} files moved to the Recycle Bin · {1} freed",
   "largefiles.deleteFailed": "Could not be moved (locked or no permission)",
   "largefiles.deletePartial": "{0} moved, {1} failed",
+  "largefiles.deletePartialProtected": "{0} moved, {1} protected (skipped)",
+  "largefiles.deletePartialBoth": "{0} moved, {1} failed, {2} protected (skipped)",
   "largefiles.openInExplorer": "Show in Explorer",
   "largefiles.protected": "Protected system path – will not be touched",
   "largefiles.capped": "List limited to {0} matches – there may be more files."

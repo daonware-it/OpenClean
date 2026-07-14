@@ -556,6 +556,8 @@
   "largefiles.deleted": "{0} arquivos movidos para a lixeira · {1} liberados",
   "largefiles.deleteFailed": "Não foi possível mover (bloqueado ou sem permissão)",
   "largefiles.deletePartial": "{0} movidos, {1} falharam",
+  "largefiles.deletePartialProtected": "{0} movidos, {1} protegidos (ignorados)",
+  "largefiles.deletePartialBoth": "{0} movidos, {1} falharam, {2} protegidos (ignorados)",
   "largefiles.openInExplorer": "Mostrar no Explorador",
   "largefiles.protected": "Caminho protegido do sistema – não será tocado",
   "largefiles.capped": "Lista limitada a {0} resultados – pode haver mais arquivos."
