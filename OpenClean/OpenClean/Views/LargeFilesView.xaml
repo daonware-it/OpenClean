@@ -181,6 +181,11 @@
                                            Foreground="{DynamicResource DangerBrush}" FontSize="11"
                                            Margin="0,2,0,0"
                                            Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}" />
+                                <!-- Von PathSafety blockiert: kein Löschversuch, eigene Meldung statt "fehlgeschlagen" -->
+                                <TextBlock Text="{loc:Loc largefiles.protected}"
+                                           Foreground="{DynamicResource WarnBrush}" FontSize="11"
+                                           Margin="0,2,0,0"
+                                           Visibility="{Binding IsProtected, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
 
                             <TextBlock Grid.Column="2" Text="{Binding SizeDisplay}" VerticalAlignment="Center"

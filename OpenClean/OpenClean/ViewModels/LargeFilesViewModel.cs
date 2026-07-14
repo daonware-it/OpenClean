@@ -25,8 +25,18 @@ public sealed class LargeFilesViewModel : ViewModelBase
     private readonly DiskScannerService _scanner = new();
     private readonly SystemInfoService _systemInfo = new();
 
+    /// <summary>Deckelung der Trefferliste – bewusst als Konstante statt Magic Number in
+    /// <see cref="DiskScanOptions.MaxFiles"/>, damit <see cref="ScanAsync"/> erkennen kann,
+    /// ob die Liste tatsächlich an der Grenze gekappt wurde.</summary>
+    private const int MaxFiles = 500;
+
     private CancellationTokenSource? _cts;
     private bool _suppressSelectionCallback;
+
+    /// <summary>True während <see cref="DeleteSelectedAsync"/> läuft. Das Löschen selbst ist
+    /// bewusst nicht abbrechbar (läuft schon in Windows) – <see cref="CancelCommand"/> darf in
+    /// dieser Zeit trotz <see cref="IsBusy"/> nicht aktiv erscheinen.</summary>
+    private bool _isDeleting;
 
     private DriveUsage? _selectedDrive;
     private int _minSizeMb = 100;
@@ -65,7 +75,7 @@ public sealed class LargeFilesViewModel : ViewModelBase
             ListSortDirection.Descending));
 
         ScanCommand = new AsyncRelayCommand(_ => ScanAsync(), _ => !IsBusy && SelectedDrive is not null);
-        CancelCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsBusy);
+        CancelCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsBusy && !_isDeleting);
         DeleteSelectedCommand = new AsyncRelayCommand(_ => DeleteSelectedAsync(), _ => CanDelete);
         SelectAllCommand = new RelayCommand(_ => SetAllSelection(true), _ => Files.Count > 0 && !IsBusy);
         DeselectAllCommand = new RelayCommand(_ => SetAllSelection(false), _ => Files.Count > 0 && !IsBusy);
@@ -153,7 +163,9 @@ public sealed class LargeFilesViewModel : ViewModelBase
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
 
-        long expectedBytes = drive.TotalBytes;
+        // Belegung, nicht Kapazität: Der Scanner summiert nur tatsächlich gefundene Bytes
+        // (siehe StorageAnalysisViewModel, dort ist derselbe Fehler bereits behoben).
+        long expectedBytes = drive.UsedBytes;
         var progress = new Progress<DiskScanProgress>(p =>
         {
             ScanProgressPercent = expectedBytes > 0
@@ -170,7 +182,7 @@ public sealed class LargeFilesViewModel : ViewModelBase
                 RootPath = drive.Name,
                 MaxDepth = 0,                       // der Finder braucht keinen Baum
                 MinFileBytes = MinSizeMb * 1024L * 1024L,
-                MaxFiles = 500,
+                MaxFiles = MaxFiles,
                 ExcludeSystemFolders = true         // Nutzerdaten-Löschpfad: Systemordner raus
             };
 
@@ -205,11 +217,17 @@ public sealed class LargeFilesViewModel : ViewModelBase
         ScanProgressText = "";
 
         long totalBytes = result.LargestFiles.Sum(f => f.SizeBytes);
-        StatusText = Files.Count == 0
+        string baseStatus = Files.Count == 0
             ? Loc.T("largefiles.noResults")
             : result.SkippedFolders > 0
                 ? Loc.T("largefiles.foundSkipped", Files.Count, ByteFormatter.Format(totalBytes), result.SkippedFolders)
                 : Loc.T("largefiles.found", Files.Count, ByteFormatter.Format(totalBytes));
+
+        // Deckelung sichtbar machen: Bei exakt MaxFiles Treffern gibt es womöglich mehr, die
+        // Liste sagt das aber sonst nicht – der Nutzer würde Vollständigkeit annehmen.
+        StatusText = Files.Count == MaxFiles
+            ? baseStatus + " " + Loc.T("largefiles.capped", MaxFiles)
+            : baseStatus;
 
         RaiseListState();
         RefreshSelectionState();
@@ -231,6 +249,9 @@ public sealed class LargeFilesViewModel : ViewModelBase
 
         if (!confirmed) return;
 
+        // Löschen selbst ist bewusst nicht abbrechbar (läuft schon in Windows) – CancelCommand
+        // darf trotz IsBusy nicht aktiv wirken, siehe RaiseCanExecuteChanged unten.
+        _isDeleting = true;
         IsBusy = true;
         StatusText = "";
 
@@ -238,7 +259,7 @@ public sealed class LargeFilesViewModel : ViewModelBase
         var deletable = selected.Where(f => PathSafety.IsDeletable(f.FullPath)).ToList();
         var blocked = selected.Except(deletable).ToList();
         foreach (var file in blocked)
-            file.MarkFailed();
+            file.MarkProtected();
 
         var paths = deletable.Select(f => f.FullPath).ToList();
 
@@ -269,7 +290,9 @@ public sealed class LargeFilesViewModel : ViewModelBase
             Files.Remove(file);
         }
 
+        _isDeleting = false;
         IsBusy = false;
+        CancelCommand.RaiseCanExecuteChanged();
 
         int failedCount = failed.Count + blocked.Count;
         StatusText = failedCount > 0

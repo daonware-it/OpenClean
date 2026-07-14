@@ -557,5 +557,6 @@
   "largefiles.deleteFailed": "Impossible de déplacer (verrouillé ou droits insuffisants)",
   "largefiles.deletePartial": "{0} déplacés, {1} échoués",
   "largefiles.openInExplorer": "Afficher dans l'Explorateur",
-  "largefiles.protected": "Chemin système protégé – ne sera pas modifié"
+  "largefiles.protected": "Chemin système protégé – ne sera pas modifié",
+  "largefiles.capped": "Liste limitée à {0} résultats – il pourrait y avoir plus de fichiers."
 }

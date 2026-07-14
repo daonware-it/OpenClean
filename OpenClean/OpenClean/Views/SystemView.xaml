@@ -273,8 +273,8 @@
                                                     Root="{Binding CurrentNode}"
                                                     DrillDownCommand="{Binding DrillDownCommand}"
                                                     NavigateUpCommand="{Binding NavigateUpCommand}"
-                                                    TrackBrush="{DynamicResource BorderBrush}"
-                                                    OtherBrush="{DynamicResource BorderBrush}"
+                                                    TrackBrush="{DynamicResource TextMutedBrush}"
+                                                    OtherBrush="{DynamicResource WarnBrush}"
                                                     StrokeBrush="{DynamicResource SurfaceBrush}"
                                                     CenterTextBrush="{DynamicResource TextBrush}" />
 

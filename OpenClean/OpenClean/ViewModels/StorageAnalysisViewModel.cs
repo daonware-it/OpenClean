@@ -152,15 +152,20 @@ public sealed class StorageAnalysisViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Wechselt zu einem Knoten. Ist er abgeschnitten (<see cref="FolderNode.IsPartial"/>),
-    /// wird sein Teilbaum vorher nachgeladen – die Bytes stimmen schon, nur die Kinder fehlen.
+    /// Wechselt zu einem Knoten. Ist er selbst abgeschnitten (<see cref="FolderNode.IsPartial"/>)
+    /// oder steckt irgendwo in den sichtbaren Ringen darunter ein abgeschnittener Nachfahre, wird
+    /// der Teilbaum vorher nachgeladen – sonst zeigte der Sunburst nach dem Zoom eine
+    /// vollflächige „eigene Dateien"-Fläche, obwohl die Bytes tatsächlich in Unterordnern
+    /// liegen, die nur wegen der Tiefenbegrenzung des vorherigen Scans nicht mehr aufgelöst
+    /// wurden (der Knoten selbst muss dafür nicht partiell sein, siehe HasPartialDescendant).
     /// </summary>
     private async Task NavigateToAsync(FolderNode? node)
     {
         if (node is null) return;
 
-        if (node.IsPartial)
+        if (HasPartialDescendant(node))
         {
+            StatusText = Loc.T("storage.loadingSubtree");
             var result = await RunScanAsync(node.FullPath, node.TotalBytes);
             if (result is null) return;
 
@@ -169,6 +174,21 @@ public sealed class StorageAnalysisViewModel : ViewModelBase
         }
 
         CurrentNode = node;
+    }
+
+    /// <summary>
+    /// True, wenn <paramref name="node"/> selbst oder irgendein Nachfahre innerhalb des
+    /// bereits geladenen Teilbaums <see cref="FolderNode.IsPartial"/> ist. Da ein Scan immer
+    /// höchstens <see cref="Controls.SunburstChart.RingCount"/> Ebenen relativ zu seiner
+    /// eigenen Wurzel auflöst, reicht ein unbegrenzter Abstieg über <see cref="FolderNode.Children"/>
+    /// – abgeschnittene Knoten haben ohnehin keine Kinder mehr und beenden den Ast von selbst.
+    /// </summary>
+    private static bool HasPartialDescendant(FolderNode node)
+    {
+        if (node.IsPartial) return true;
+        foreach (var child in node.Children)
+            if (HasPartialDescendant(child)) return true;
+        return false;
     }
 
     /// <summary>

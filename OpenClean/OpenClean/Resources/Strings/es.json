@@ -557,5 +557,6 @@
   "largefiles.deleteFailed": "No se pudo mover (bloqueado o sin permisos)",
   "largefiles.deletePartial": "{0} movidos, {1} fallidos",
   "largefiles.openInExplorer": "Mostrar en el Explorador",
-  "largefiles.protected": "Ruta protegida del sistema – no se tocará"
+  "largefiles.protected": "Ruta protegida del sistema – no se tocará",
+  "largefiles.capped": "Lista limitada a {0} resultados – puede haber más archivos."
 }

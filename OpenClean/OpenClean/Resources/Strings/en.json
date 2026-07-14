@@ -557,5 +557,6 @@
   "largefiles.deleteFailed": "Could not be moved (locked or no permission)",
   "largefiles.deletePartial": "{0} moved, {1} failed",
   "largefiles.openInExplorer": "Show in Explorer",
-  "largefiles.protected": "Protected system path – will not be touched"
+  "largefiles.protected": "Protected system path – will not be touched",
+  "largefiles.capped": "List limited to {0} matches – there may be more files."
 }
