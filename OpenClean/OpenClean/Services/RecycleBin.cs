@@ -67,10 +67,21 @@ public static class RecycleBin
     private const ushort FOF_ALLOWUNDO = 0x0040;        // => Papierkorb statt hartem Löschen
     private const ushort FOF_NOCONFIRMATION = 0x0010;   // eigene Bestätigung ist schon erfolgt
     private const ushort FOF_NOERRORUI = 0x0400;        // Fehler melden wir selbst, kein Windows-Dialog
-    private const ushort FOF_SILENT = 0x0004;
+
+    // FOF_WANTNUKEWARNING hebt FOF_NOCONFIRMATION gezielt für den Fall auf, dass eine Datei
+    // größer ist als die für das Laufwerk konfigurierte Papierkorb-Quote: Windows fragt dann
+    // trotzdem nach ("Datei ist zu groß für den Papierkorb – endgültig löschen?"), statt
+    // FOF_NOCONFIRMATION greifen zu lassen und die Datei still-endgültig zu löschen.
+    // FOF_SILENT (nur Fortschrittsanzeige unterdrücken) wird deshalb bewusst NICHT gesetzt:
+    // MSDN dokumentiert FOF_SILENT nur als "kein Fortschrittsdialog", in der Praxis blenden
+    // manche Windows-Versionen mit FOF_SILENT aber auch Rückfragen wie die Nuke-Warnung aus –
+    // das darf hier nicht passieren, sonst wäre FOF_WANTNUKEWARNING wirkungslos.
+    private const ushort FOF_WANTNUKEWARNING = 0x4000;
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHFileOperation(ref SHFILEOPSTRUCT fileOp);
+
+    private const int MoveTimeoutMs = 60_000;
 
     /// <summary>
     /// Verschiebt die angegebenen Dateien in den Papierkorb (nicht hart löschen –
@@ -79,6 +90,19 @@ public static class RecycleBin
     /// <para>Jede Datei wird einzeln übergeben: So scheitert nicht der ganze Stapel, wenn
     /// eine Datei gesperrt ist. Zurück kommen genau die Pfade, die NICHT verschoben werden
     /// konnten – die Oberfläche zeigt sie mit Fehlermarkierung weiter an.</para>
+    ///
+    /// <para><b>Zu große Dateien für den Papierkorb:</b> Ist eine Datei größer als die für das
+    /// Laufwerk konfigurierte Papierkorb-Quote, fragt Windows wegen <see cref="FOF_WANTNUKEWARNING"/>
+    /// trotz <see cref="FOF_NOCONFIRMATION"/> nach, ob sie endgültig gelöscht werden soll. Deshalb
+    /// läuft die Operation je Datei auf einem eigenen STA-Thread mit Zeitlimit (gleiches Muster wie
+    /// <see cref="Empty"/>): SHFileOperation pumpt darin Nachrichten und kann den Dialog anzeigen.
+    /// Bricht der Nutzer ab, meldet <c>fAnyOperationsAborted</c> das korrekt als Fehlschlag; reagiert
+    /// er nicht innerhalb des Zeitlimits, gilt der Pfad ebenfalls als fehlgeschlagen (fail-safe:
+    /// kein Zeitüberschreiten in einen stillen Erfolg ummünzen).</para>
+    ///
+    /// <para><b>Pfadlänge:</b> <c>SHFileOperation</c> unterstützt keine Pfade über <c>MAX_PATH</c>
+    /// (260 Zeichen). Solche Pfade schlagen bei der API fehl und landen dadurch automatisch in der
+    /// <c>failed</c>-Liste – das ist beabsichtigtes Fail-safe-Verhalten, kein Bug.</para>
     /// </summary>
     public static IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths)
     {
@@ -88,16 +112,25 @@ public static class RecycleBin
         {
             try
             {
-                // pFrom muss doppelt null-terminiert sein (die API erwartet eine Liste).
-                var op = new SHFILEOPSTRUCT
-                {
-                    wFunc = FO_DELETE,
-                    pFrom = path + "\0\0",
-                    fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT
-                };
+                int result = -1;
+                bool aborted = true;
 
-                int result = SHFileOperation(ref op);
-                if (result != 0 || op.fAnyOperationsAborted)
+                // pFrom muss doppelt null-terminiert sein (die API erwartet eine Liste).
+                string capturedPath = path;
+                bool completed = RunSta(() =>
+                {
+                    var op = new SHFILEOPSTRUCT
+                    {
+                        wFunc = FO_DELETE,
+                        pFrom = capturedPath + "\0\0",
+                        fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_WANTNUKEWARNING
+                    };
+
+                    result = SHFileOperation(ref op);
+                    aborted = op.fAnyOperationsAborted;
+                }, MoveTimeoutMs);
+
+                if (!completed || result != 0 || aborted)
                     failed.Add(path);
             }
             catch
