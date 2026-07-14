@@ -34,14 +34,16 @@ public class DiskScannerServiceTests : IDisposable
         File.WriteAllBytes(path, new byte[bytes]);
     }
 
-    private Task<DiskScanResult> ScanAsync(int maxDepth = 3, long minFileBytes = 0, int maxFiles = 500)
+    private Task<DiskScanResult> ScanAsync(
+        int maxDepth = 3, long minFileBytes = 0, int maxFiles = 500, bool excludeSystemFolders = false)
         => new DiskScannerService().ScanAsync(
             new DiskScanOptions
             {
                 RootPath = _root,
                 MaxDepth = maxDepth,
                 MinFileBytes = minFileBytes,
-                MaxFiles = maxFiles
+                MaxFiles = maxFiles,
+                ExcludeSystemFolders = excludeSystemFolders
             },
             progress: null,
             ct: CancellationToken.None);
@@ -122,6 +124,52 @@ public class DiskScannerServiceTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             new DiskScannerService().ScanAsync(
                 new DiskScanOptions { RootPath = _root }, progress: null, ct: cts.Token));
+    }
+
+    // Hinweis zur Testbarkeit: PathSafety.IsExcludedFolder prüft nicht nur echte
+    // Systempfade (C:\Windows, Program Files, …), sondern zusätzlich – laufwerksunabhängig –
+    // ob irgendein Pfadsegment "$Recycle.Bin" oder "System Volume Information" heißt
+    // (siehe ExcludedAnyDriveFolders in PathSafety.cs). Dieser zweite Zweig lässt sich mit
+    // einem so benannten Unterordner im Temp-Testverzeichnis ehrlich testen, ohne echte
+    // Systempfade der laufenden Maschine anzufassen oder Produktionscode zu ändern.
+
+    [Fact]
+    public async Task ExcludeSystemFolders_True_SchliesstDateienInGesperrtemOrdnerAusDenGroesstenDateienAus()
+    {
+        WriteFile(100, "normal.bin");
+        WriteFile(9000, "$Recycle.Bin", "geloescht.bin");
+
+        var result = await ScanAsync(excludeSystemFolders: true);
+
+        var only = Assert.Single(result.LargestFiles);
+        Assert.EndsWith("normal.bin", only.FullPath);
+    }
+
+    [Fact]
+    public async Task ExcludeSystemFolders_True_GesperrterOrdnerFehltImBaum()
+    {
+        WriteFile(100, "normal.bin");
+        WriteFile(9000, "$Recycle.Bin", "geloescht.bin");
+
+        var result = await ScanAsync(excludeSystemFolders: true);
+
+        Assert.DoesNotContain(result.Root.Children, c => c.Name == "$Recycle.Bin");
+        // Die ausgeschlossenen Bytes dürfen nicht in die Gesamtsumme der Wurzel einfließen.
+        Assert.Equal(100, result.Root.TotalBytes);
+    }
+
+    [Fact]
+    public async Task ExcludeSystemFolders_False_GesperrterOrdnerWirdGanzNormalGescannt()
+    {
+        WriteFile(100, "normal.bin");
+        WriteFile(9000, "$Recycle.Bin", "geloescht.bin");
+
+        var result = await ScanAsync(excludeSystemFolders: false);
+
+        Assert.Contains(result.Root.Children, c => c.Name == "$Recycle.Bin");
+        Assert.Equal(2, result.LargestFiles.Count);
+        Assert.Contains(result.LargestFiles, f => f.FullPath.EndsWith("geloescht.bin"));
+        Assert.Equal(9100, result.Root.TotalBytes);
     }
 
     [Fact]
