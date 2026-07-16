@@ -4,7 +4,7 @@
 
 **Honest system cleaning for Windows — real measurements, no telemetry, no dark patterns.**
 
-[![Version](https://img.shields.io/badge/version-1.1.0-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-2ecc87)](https://github.com/daonware-it/OpenClean/releases)
 [![Downloads](https://img.shields.io/github/downloads/daonware-it/OpenClean/total?color=2ecc87&label=downloads)](https://github.com/daonware-it/OpenClean/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d6)](#download)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4)](https://dotnet.microsoft.com/)
@@ -23,9 +23,12 @@ and **no telemetry**. Every number you see is a real measurement.
 **Free — everything you need for day-to-day maintenance:**
 
 - 🧭 **Overview dashboard** — a real system score with the exact factors behind it (reclaimable space, startup load, drive pressure) and one-click recommendations.
-- 💾 **Storage & RAM** — live memory usage and per-drive space, purely informational (no gimmicks).
+- 💾 **Storage & RAM** — live memory usage and per-drive space, plus a sunburst analysis you can click into to see what actually occupies the drive.
 - 🧹 **Cleanup** — preview temp files and caches (Windows, thumbnails, browsers, …) before anything is deleted. **You decide** what gets removed.
-- ⭐ **Startup** — see and manage autostart entries and their impact on boot time.
+- ↩️ **Safety net & restore** — optionally create a restore point and back up files before a cleanup, then undo a whole run from the Restore view. Existing Windows restore points are listed there too.
+- 📦 **Large files** — track down the biggest space hogs and move them to the Recycle Bin. Files that cannot go to the bin are named before anything is deleted.
+- ⭐ **Startup** — see and manage autostart entries and their impact on boot time, or stagger them after sign-in instead of launching everything at once.
+- 🖱️ **Context menu** — switch off entries in the Windows right-click menu (nothing is deleted).
 - 🛡️ **Privacy** — find and clear privacy-relevant traces.
 - ⬆️ **Updates** — check for new System versions.
 - 🗑️ **Uninstall** — list installed programs by size and remove them, including a scan for leftover folders and registry remnants. **Single uninstall is always free.**
@@ -55,7 +58,7 @@ Grab the latest release from the [**Releases**](https://github.com/daonware-it/O
 - **Installer** (`OpenClean-Setup-x.y.z.exe`) — classic setup, stores its settings in `%AppData%\OpenClean`.
 - **Portable** (`OpenClean-Portable-x.y.z.zip`) — a single self-contained executable that keeps its data next to itself. Runs from a USB stick; no installation, no .NET required.
 
-Both are **code-signed** (Azure Trusted Signing, publisher *DaonWare*), so Windows SmartScreen accepts them without warnings.
+Both are **code-signed** (Azure Trusted Signing, publisher *DaonWare*), so Windows SmartScreen accepts them without warnings. On start OpenClean verifies its own signature and locks the modifying functions if the file was tampered with after signing; builds from source are unsigned and keep working, they only show a hint.
 
 ## Privacy & offline
 
