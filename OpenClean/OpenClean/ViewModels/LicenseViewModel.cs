@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
 
 namespace OpenClean.ViewModels;
@@ -65,6 +66,14 @@ public sealed class LicenseViewModel : ViewModelBase
 
     private async Task ActivateAsync()
     {
+        // Sperre bei erkannter Manipulation (OPCL-20): In einem manipulierten Prozess wird
+        // kein Premium-Modul vom Server geholt und abgelegt.
+        if (IntegrityState.IsBlocked)
+        {
+            StatusText = Loc.T("integrity.blocked.action");
+            return;
+        }
+
         IsBusy = true;
         StatusText = Loc.T("premium.activate.working");
 

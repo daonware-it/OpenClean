@@ -17,7 +17,12 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$OutDir
+    [string]$OutDir,
+
+    # Prüft nach dem Build, dass alles im Ausgabeordner gültig von DaonWare signiert ist.
+    # Standardmäßig aus: Der lokale Build ist unsigniert (das Zertifikat liegt nur in der
+    # Release-Pipeline). In der Pipeline wird der Schalter NACH dem Signieren gesetzt.
+    [switch]$VerifySignatures
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,6 +52,13 @@ if ($LASTEXITCODE -ne 0) {
 # Portable-Marker: aktiviert beim Start den Portable-Modus (Config neben der EXE).
 $marker = Join-Path $OutDir 'OpenClean.portable'
 Set-Content -Path $marker -Value 'Diese Datei aktiviert den Portable-Modus von OpenClean. Nicht loeschen.' -Encoding UTF8
+
+if ($VerifySignatures) {
+    & (Join-Path $PSScriptRoot 'verify-signatures.ps1') -Path $OutDir -UseSignTool
+    if ($LASTEXITCODE -ne 0) {
+        throw "Signaturprüfung fehlgeschlagen (Exit-Code $LASTEXITCODE)."
+    }
+}
 
 Write-Host "==> Fertig. Portable-EXE + Marker liegen in:" -ForegroundColor Green
 Write-Host "    $OutDir"

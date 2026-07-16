@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
+using OpenClean.Services.Safety;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -243,10 +244,19 @@ public sealed class LargeFilesViewModel : ViewModelBase
 
         long expectedBytes = selected.Sum(f => f.SizeBytes);
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
-            Loc.T("largefiles.confirm", selected.Count, ByteFormatter.Format(expectedBytes)));
+        // Ehrlich ansagen, was NICHT im Papierkorb landet: Bei aktivem „Dateien sofort löschen“,
+        // auf Laufwerken ohne Papierkorb oder oberhalb der Quote löscht Windows endgültig. Das
+        // gehört VOR die Entscheidung – nicht als Windows-Rückfrage mitten in den Lauf.
+        var permanent = selected.Where(f => !RecycleBin.WillGoToRecycleBin(f.FullPath, f.SizeBytes)).ToList();
 
+        string message = Loc.T("largefiles.confirm", selected.Count, ByteFormatter.Format(expectedBytes));
+        if (permanent.Count > 0)
+        {
+            message += Loc.T("largefiles.confirm.permanent",
+                permanent.Count, ByteFormatter.Format(permanent.Sum(f => f.SizeBytes)));
+        }
+
+        bool confirmed = ConfirmDialog.Show(Application.Current?.MainWindow, message);
         if (!confirmed) return;
 
         // Löschen selbst ist bewusst nicht abbrechbar (läuft schon in Windows) – CancelCommand
@@ -264,8 +274,6 @@ public sealed class LargeFilesViewModel : ViewModelBase
             foreach (var file in blocked)
                 file.MarkProtected();
 
-            var paths = deletable.Select(f => f.FullPath).ToList();
-
             // Fensterhandle MUSS auf dem UI-Thread beschafft werden (vor dem Task.Run) – ein
             // eventueller "zu groß für den Papierkorb"-Dialog soll modal zum Hauptfenster
             // erscheinen. Der eigentliche Aufruf läuft im Hintergrund, weil er ohne Zeitlimit auf
@@ -273,18 +281,54 @@ public sealed class LargeFilesViewModel : ViewModelBase
             IntPtr ownerHandle = Application.Current?.MainWindow is { } mainWindow
                 ? new WindowInteropHelper(mainWindow).Handle
                 : IntPtr.Zero;
-            IReadOnlyList<string> failedPaths = await Task.Run(() => RecycleBin.MoveToRecycleBin(paths, ownerHandle));
 
-            var failed = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
+            // Über eine Backup-Sitzung löschen, damit der Lauf im Wiederherstellen-Bereich auftaucht
+            // und sich rückgängig machen lässt – bisher ging dieser Bereich als einziger direkt an
+            // die Shell, weshalb im Papierkorb liegende Dateien in der App als „weg“ galten.
+            //
+            // Kein Wiederherstellungspunkt (anders als SafetyPrompt.PrepareAsync): Die
+            // Systemwiederherstellung sichert keine Nutzerdaten, für eine gelöschte Videodatei wäre
+            // sie also wirkungslos – nur ein minutenlanger Umweg vor dem Löschen.
+            //
+            // RecycleOnly: NIEMALS eine Backup-Kopie anlegen. Eine mehrere GB große Datei erst zu
+            // kopieren würde den Platzbedarf verdoppeln und den Zweck des Bereichs zerstören.
+            BackupSession? session = SettingsService.Instance.Current.Safety.BackupBeforeDelete
+                ? BackupService.Instance.BeginSession("largefiles", ownerHandle)
+                : null;
+
+            var requests = deletable
+                .Select(f => new SafeDeleteRequest(f.FullPath, false, f.SizeBytes))
+                .ToList();
+
+            IReadOnlyList<SafeDeleteOutcome> outcomes = await Task.Run(() =>
+            {
+                if (session is not null)
+                    return session.TryDeleteMany(requests, SafeDeleteStrategy.RecycleOnly);
+
+                // Sicherheitsnetz abgeschaltet -> direkt in den Papierkorb wie bisher.
+                var failedPaths = RecycleBin.MoveToRecycleBin(
+                    requests.Select(r => r.Path).ToList(), ownerHandle);
+                var failedSet = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
+                return requests
+                    .Select(r => failedSet.Contains(r.Path)
+                        ? SafeDeleteOutcome.Skipped
+                        : SafeDeleteOutcome.Deleted)
+                    .ToList();
+            });
+
+            session?.Commit();
 
             long freedBytes = 0;
             int deletedCount = 0;
+            int failedCount = 0;
 
-            foreach (var file in deletable)
+            for (int i = 0; i < deletable.Count; i++)
             {
-                if (failed.Contains(file.FullPath))
+                var file = deletable[i];
+                if (outcomes[i] != SafeDeleteOutcome.Deleted)
                 {
                     file.MarkFailed();
+                    failedCount++;
                     continue;
                 }
 
@@ -297,7 +341,6 @@ public sealed class LargeFilesViewModel : ViewModelBase
             // "fehlgeschlagen" (das widerspräche der Liste, die sie schon als "Geschützter
             // Systempfad" ausweist), sondern werden getrennt ausgewiesen.
             int blockedCount = blocked.Count;
-            int failedCount = failed.Count;
 
             StatusText = (failedCount, blockedCount) switch
             {

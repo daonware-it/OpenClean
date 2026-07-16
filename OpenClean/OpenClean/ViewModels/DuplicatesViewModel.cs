@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Media.Imaging;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
+using OpenClean.Services.Safety;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -50,8 +52,10 @@ public sealed class DuplicatesViewModel : ViewModelBase
         CancelCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsBusy);
         AutoSelectCommand = new RelayCommand(p => AutoSelect(ParseStrategy(p)), _ => !IsBusy && Groups.Count > 0);
         ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBusy && Groups.Count > 0);
+        // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) gesperrt. Wichtig,
+        // weil hier direkt File.Delete aufgerufen wird – ohne einen der abgesicherten Services.
         DeleteSelectedCommand = new AsyncRelayCommand(_ => DeleteSelectedAsync(),
-            _ => !IsBusy && SelectedCount > 0);
+            _ => !IsBusy && SelectedCount > 0 && !IntegrityState.IsBlocked);
 
         StatusText = Loc.T("duplicates.status.idle");
     }
@@ -224,6 +228,15 @@ public sealed class DuplicatesViewModel : ViewModelBase
 
     private async Task DeleteSelectedAsync()
     {
+        // Zweite Verteidigungslinie neben CanExecute: hier wird direkt gelöscht (File.Delete),
+        // es gibt also keinen Service, der die Sperre sonst durchsetzen würde.
+        if (IntegrityState.IsBlocked)
+        {
+            MessageBox.Show(Loc.T("integrity.blocked.action"), "OpenClean",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         int count = SelectedCount;
         long bytes = SelectedBytes;
         if (count == 0) return;
@@ -235,11 +248,25 @@ public sealed class DuplicatesViewModel : ViewModelBase
             Loc.T("duplicates.action.delete"));
         if (!confirmed) return;
 
+        // Sicherheitsnetz vorbereiten (Wiederherstellungspunkt + Datei-Backup/Undo).
+        // Läuft VOR dem IsBusy-Wechsel, damit ein Abbruch den Zustand unberührt lässt.
+        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(Application.Current?.MainWindow, "duplicates");
+        if (!prep.Proceed)
+        {
+            StatusText = Loc.T("safety.aborted");
+            return;
+        }
+
         IsBusy = true;
         StatusText = Loc.T("duplicates.status.deleting");
 
+        var session = prep.Session;
         var groups = Groups.ToList();
-        var (deleted, freed, skipped) = await Task.Run(() =>
+        int deleted = 0, skipped = 0;
+        long freed = 0;
+        try
+        {
+        (deleted, freed, skipped) = await Task.Run(() =>
         {
             int deletedCount = 0, skippedCount = 0;
             long freedBytes = 0;
@@ -259,10 +286,29 @@ public sealed class DuplicatesViewModel : ViewModelBase
                 {
                     try
                     {
-                        File.Delete(file.FilePath);
-                        deletedCount++;
-                        freedBytes += file.SizeBytes;
-                        file.MarkDeleted();
+                        if (session != null)
+                        {
+                            // Über das Sicherheitsnetz löschen: Nutzerdaten bevorzugt sichern (Undo).
+                            var outcome = session.TryDelete(file.FilePath, false, file.SizeBytes, SafeDeleteStrategy.PreferBackup);
+                            if (outcome == SafeDeleteOutcome.Deleted)
+                            {
+                                deletedCount++;
+                                freedBytes += file.SizeBytes;
+                                file.MarkDeleted();
+                            }
+                            else
+                            {
+                                skippedCount++;
+                            }
+                        }
+                        else
+                        {
+                            // Fallback ohne Backup (Sicherheitsnetz abgeschaltet): direkt löschen.
+                            File.Delete(file.FilePath);
+                            deletedCount++;
+                            freedBytes += file.SizeBytes;
+                            file.MarkDeleted();
+                        }
                     }
                     catch
                     {
@@ -286,11 +332,18 @@ public sealed class DuplicatesViewModel : ViewModelBase
         }
         SelectedGroup ??= Groups.FirstOrDefault();
 
-        IsBusy = false;
         OnPropertyChanged(nameof(HasGroups));
         RefreshSelection();
         StatusText = Loc.T("duplicates.status.deleted", deleted, ByteFormatter.Format(freed)) +
                      (skipped > 0 ? Loc.T("duplicates.status.skipped", skipped) : "");
+        }
+        finally
+        {
+            // Manifest IMMER schreiben (auch bei unerwartetem Fehler) – sonst wären bereits gelöschte
+            // Dateien ohne Undo und der Ordner würde nie aufgeräumt. Commit ist idempotent.
+            prep.Session?.Commit();
+            IsBusy = false;
+        }
     }
 
     // ---- Lokalisierung ------------------------------------------------------

@@ -59,12 +59,26 @@
 
         <!-- ===== Header ===== -->
         <Grid Grid.Row="0">
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="{loc:Loc startup.title}" Style="{StaticResource HeaderText}" FontSize="24" />
-                <TextBlock Text="{loc:Loc startup.subtitle}"
-                           Style="{StaticResource MutedText}" Margin="0,4,0,0" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <!-- Titel und Button-Leiste nebeneinander, der Untertitel darunter über die volle
+                 Breite – so bleibt er auch bei vielen Buttons vollständig lesbar. -->
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc startup.title}"
+                       Style="{StaticResource HeaderText}" FontSize="24"
+                       VerticalAlignment="Center" Margin="0,0,16,0" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                       Text="{loc:Loc startup.subtitle}" TextWrapping="Wrap"
+                       Style="{StaticResource MutedText}" Margin="0,4,0,0" />
+
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal"
+                        HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Segmentierter Statusfilter -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <RadioButton Style="{StaticResource SegmentButton}" GroupName="StatusFilter"
@@ -80,6 +94,21 @@
                                  IsChecked="{Binding StatusFilter, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Deaktiviert}" />
                 </StackPanel>
+                <!-- Automatische Staffelung / alle Verzögerungen aufheben -->
+                <Button Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="0,0,8,0"
+                        Command="{Binding StaggerCommand}" ToolTip="{loc:Loc startup.stagger.tooltip}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              Data="M12 2 a10 10 0 1 0 10 10 M12 6 v6 l4 2" />
+                        <TextBlock Text="{loc:Loc startup.stagger.button}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="0,0,8,0"
+                        Command="{Binding ClearDelaysCommand}"
+                        Content="{loc:Loc startup.stagger.clear}"
+                        Visibility="{Binding HasDelays, Converter={StaticResource BoolToVis}}" />
                 <Button Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
                         Command="{Binding RefreshCommand}">
                     <StackPanel Orientation="Horizontal">
@@ -99,9 +128,10 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="170" />
-                    <ColumnDefinition Width="200" />
                     <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="130" />
                     <ColumnDefinition Width="70" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="{loc:Loc startup.col.program}" Style="{StaticResource MutedText}"
@@ -112,7 +142,9 @@
                            FontSize="10.5" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="3" Text="{loc:Loc startup.col.impact}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="4" Text="{loc:Loc startup.col.status}" Style="{StaticResource MutedText}"
+                <TextBlock Grid.Column="4" Text="{loc:Loc startup.col.delay}" Style="{StaticResource MutedText}"
+                           FontSize="10.5" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="5" Text="{loc:Loc startup.col.status}" Style="{StaticResource MutedText}"
                            FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Right" />
             </Grid>
         </Border>
@@ -129,9 +161,10 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="170" />
-                                        <ColumnDefinition Width="200" />
                                         <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="130" />
                                         <ColumnDefinition Width="70" />
                                     </Grid.ColumnDefinitions>
 
@@ -187,8 +220,36 @@
                                         </StackPanel>
                                     </Border>
 
+                                    <!-- Verzögerung: startet das Programm erst x nach der Anmeldung -->
+                                    <ComboBox Grid.Column="4"
+                                              Height="32" Width="112" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                              Margin="0,0,12,0" FontSize="12.5"
+                                              ToolTipService.ShowOnDisabled="True"
+                                              SelectedValuePath="Seconds"
+                                              ItemsSource="{Binding DataContext.DelayOptions,
+                                                            RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                              SelectedValue="{Binding DelaySeconds, Mode=TwoWay}"
+                                              IsEnabled="{Binding CanDelay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Display}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                        <ComboBox.Style>
+                                            <Style TargetType="ComboBox" BasedOn="{StaticResource LanguageCombo}">
+                                                <Setter Property="ToolTip" Value="{loc:Loc startup.delay.tooltip}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CanDelay}" Value="False">
+                                                        <Setter Property="ToolTip"
+                                                                Value="{loc:Loc startup.delay.notSupported}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ComboBox.Style>
+                                    </ComboBox>
+
                                     <!-- Toggle -->
-                                    <StackPanel Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="5" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <ToggleButton IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                                       IsEnabled="{Binding CanToggle}"
                                                       ToolTip="{Binding StatusDisplay}" HorizontalAlignment="Right">
@@ -230,6 +291,9 @@
                     <TextBlock Text="{loc:Loc startup.taskSchedulerNote}"
                                Foreground="{DynamicResource TextMutedBrush}"
                                FontSize="10.5" Opacity="0.75" Margin="0,3,0,0" />
+                    <TextBlock Text="{loc:Loc startup.delay.note}"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               FontSize="10.5" Opacity="0.75" Margin="0,2,0,0" />
                 </StackPanel>
                 <ProgressBar Style="{StaticResource LoadingBar}" Width="160" HorizontalAlignment="Right"
                              VerticalAlignment="Center"

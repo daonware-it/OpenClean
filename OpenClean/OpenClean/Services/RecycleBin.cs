@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Microsoft.Win32;
 
 namespace OpenClean.Services;
 
@@ -48,6 +49,114 @@ public static class RecycleBin
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, RecycleFlags dwFlags);
 
+    // ---- Papierkorb-Quote je Laufwerk ---------------------------------------
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetVolumeNameForVolumeMountPoint(
+        string lpszVolumeMountPoint, System.Text.StringBuilder lpszVolumeName, uint cchBufferLength);
+
+    /// <summary>
+    /// Sagt vorher, ob ein Objekt dieser Größe wirklich im Papierkorb landet – oder ob Windows es
+    /// endgültig löscht. Drei Fälle führen zum Nuke:
+    ///
+    /// <list type="bullet">
+    /// <item>Die Richtlinie <c>NoRecycleFiles</c> ist gesetzt (papierkorbloses Löschen erzwungen).</item>
+    /// <item>Für das Laufwerk ist <c>NukeOnDelete</c> aktiv (Windows-Option „Dateien sofort löschen“) –
+    /// das trifft JEDE Datei und passiert OHNE Rückfrage.</item>
+    /// <item>Das Objekt ist größer als die Quote (<c>MaxCapacity</c>) des Laufwerks – dann fragt Windows
+    /// wegen <see cref="FOF_WANTNUKEWARNING"/> immerhin nach.</item>
+    /// </list>
+    ///
+    /// <para>Laufwerke ohne eigenen Papierkorb (Wechselmedien, Netzpfade) haben keinen
+    /// Volume-Eintrag; dort wird ebenfalls endgültig gelöscht.</para>
+    ///
+    /// <para>Lässt sich die Quote nicht bestimmen, kommt <c>true</c> zurück: Dann greift immer noch
+    /// die Nuke-Warnung von Windows selbst – lieber nicht warnen als fälschlich warnen.</para>
+    /// </summary>
+    public static bool WillGoToRecycleBin(string path, long sizeBytes)
+    {
+        try
+        {
+            // Richtlinie schlägt alles andere.
+            using (RegistryKey? policy = Registry.CurrentUser.OpenSubKey(
+                       @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"))
+            {
+                if (policy?.GetValue("NoRecycleFiles") is int nrf && nrf == 1) return false;
+            }
+
+            // UNC/Netzpfade führen keinen Papierkorb -> sicher endgültig. Das ist etwas anderes als
+            // "Volume nicht ermittelbar" weiter unten und muss deshalb VOR der GUID-Suche stehen.
+            if (IsNetworkPath(path)) return false;
+
+            string? guid = TryGetVolumeGuid(path);
+            if (guid is null) return true; // Volume nicht ermittelbar -> Windows entscheiden lassen.
+
+            using RegistryKey? vol = Registry.CurrentUser.OpenSubKey(
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\" + guid);
+
+            // Kein Volume-Eintrag -> Laufwerk führt keinen Papierkorb (z. B. Wechselmedium/Netzpfad).
+            if (vol is null) return false;
+
+            if (vol.GetValue("NukeOnDelete") is int nuke && nuke == 1) return false;
+
+            // MaxCapacity steht in MB. Fehlt der Wert, ist die Quote unbestimmt -> nicht warnen.
+            if (vol.GetValue("MaxCapacity") is not int maxMb) return true;
+
+            return sizeBytes <= maxMb * 1024L * 1024L;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>True für UNC-/Netzpfade – die führen keinen Papierkorb.</summary>
+    private static bool IsNetworkPath(string path)
+    {
+        try
+        {
+            string? root = Path.GetPathRoot(Path.GetFullPath(path));
+            if (string.IsNullOrEmpty(root)) return false;
+
+            // "\\server\share\" -> UNC. Die Win32-Präfixe \\?\ und \\.\ sind KEINE Netzpfade.
+            if (!root.StartsWith(@"\\", StringComparison.Ordinal)) return false;
+            if (root.StartsWith(@"\\?\", StringComparison.Ordinal) ||
+                root.StartsWith(@"\\.\", StringComparison.Ordinal)) return false;
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Ermittelt die Volume-GUID ("{…}") des Laufwerks, auf dem <paramref name="path"/> liegt.</summary>
+    private static string? TryGetVolumeGuid(string path)
+    {
+        try
+        {
+            string? root = Path.GetPathRoot(Path.GetFullPath(path));
+            if (string.IsNullOrEmpty(root)) return null;
+
+            var sb = new System.Text.StringBuilder(64);
+            if (!GetVolumeNameForVolumeMountPoint(root, sb, (uint)sb.Capacity)) return null;
+
+            // Ergebnis: "\\?\Volume{GUID}\" -> die Registry führt nur "{GUID}".
+            string name = sb.ToString();
+            int start = name.IndexOf('{');
+            int end = name.IndexOf('}');
+            if (start < 0 || end < start) return null;
+
+            return name[start..(end + 1)];
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ---- In den Papierkorb verschieben (Große-Dateien-Finder) ---------------
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -89,21 +198,35 @@ public static class RecycleBin
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHFileOperation(ref SHFILEOPSTRUCT fileOp);
 
+    // Stapelgrößen für MoveToRecycleBin. pFrom ist eine doppelt null-terminierte LISTE, ein
+    // einziger SHFileOperation-Aufruf kann also viele Pfade auf einmal verarbeiten. Das ist der
+    // entscheidende Hebel: der Aufruf kostet einen eigenen STA-Thread plus Shell-Initialisierung,
+    // pro Datei wären das bei tausenden Temp-Dateien Minuten.
+    // Grenzen: SHFILEOPSTRUCT hat kein Längenfeld, für pFrom gilt praktisch ein Puffer-Limit –
+    // deshalb zusätzlich nach Zeichen begrenzen. 128 Objekte halten außerdem die Fortschritts-
+    // anzeige feingranular genug (die Meldung erfolgt je Stapel, nicht je Datei).
+    private const int RecycleBatchMaxItems = 128;
+    private const int RecycleBatchMaxChars = 30_000;
+
     /// <summary>
     /// Verschiebt die angegebenen Dateien in den Papierkorb (nicht hart löschen –
     /// ein Fehlgriff bleibt so umkehrbar).
     ///
-    /// <para>Jede Datei wird einzeln übergeben: So scheitert nicht der ganze Stapel, wenn
-    /// eine Datei gesperrt ist. Zurück kommen genau die Pfade, die NICHT verschoben werden
-    /// konnten – die Oberfläche zeigt sie mit Fehlermarkierung weiter an.</para>
+    /// <para><b>Stapelverarbeitung:</b> Die Pfade werden in Stapeln an <see cref="SHFileOperation"/>
+    /// übergeben (siehe <see cref="RecycleBatchMaxItems"/>). Scheitert ein Stapel, wird genau dieser
+    /// Stapel einzeln nachgearbeitet, um die schuldigen Pfade exakt zu bestimmen – der Rückgabewert
+    /// bleibt damit wie bisher „genau die Pfade, die NICHT verschoben werden konnten“, die Oberfläche
+    /// zeigt sie weiterhin mit Fehlermarkierung an.</para>
     ///
     /// <para><b>Zu große Dateien für den Papierkorb:</b> Ist eine Datei größer als die für das
     /// Laufwerk konfigurierte Papierkorb-Quote, fragt Windows wegen <see cref="FOF_WANTNUKEWARNING"/>
     /// trotz <see cref="FOF_NOCONFIRMATION"/> nach, ob sie endgültig gelöscht werden soll. Deshalb
-    /// läuft die Operation je Datei auf einem eigenen STA-Thread (gleiches Muster wie <see cref="Empty"/>,
+    /// läuft jeder Aufruf auf einem eigenen STA-Thread (gleiches Muster wie <see cref="Empty"/>,
     /// aber bewusst OHNE Zeitlimit – siehe Kommentar bei <see cref="FO_DELETE"/>): SHFileOperation pumpt
     /// darin Nachrichten und kann den Dialog anzeigen. Bricht der Nutzer ab, meldet
-    /// <c>fAnyOperationsAborted</c> das korrekt als Fehlschlag.</para>
+    /// <c>fAnyOperationsAborted</c> das korrekt als Fehlschlag – dann gilt der ganze Stapel zunächst als
+    /// gescheitert und wird einzeln nachgearbeitet, sodass nur die tatsächlich betroffene Datei erneut
+    /// nachfragt und die übrigen normal in den Papierkorb wandern.</para>
     ///
     /// <para><b>Eigentümerfenster:</b> <paramref name="ownerWindow"/> wird als <c>hwnd</c> an
     /// <c>SHFILEOPSTRUCT</c> durchgereicht, damit ein eventueller Nuke-Warnungs-Dialog modal zum
@@ -119,40 +242,92 @@ public static class RecycleBin
     public static IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths, IntPtr ownerWindow = default)
     {
         var failed = new List<string>();
+        var batch = new List<string>(RecycleBatchMaxItems);
+        int chars = 0;
 
         foreach (string path in paths)
         {
-            try
+            int cost = path.Length + 1; // + Trenner-NUL des Eintrags
+            if (batch.Count > 0 && (batch.Count >= RecycleBatchMaxItems || chars + cost > RecycleBatchMaxChars))
             {
-                int result = -1;
-                bool aborted = true;
-
-                // pFrom muss doppelt null-terminiert sein (die API erwartet eine Liste).
-                string capturedPath = path;
-                RunSta(() =>
-                {
-                    var op = new SHFILEOPSTRUCT
-                    {
-                        hwnd = ownerWindow,
-                        wFunc = FO_DELETE,
-                        pFrom = capturedPath + "\0\0",
-                        fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_WANTNUKEWARNING
-                    };
-
-                    result = SHFileOperation(ref op);
-                    aborted = op.fAnyOperationsAborted;
-                });
-
-                if (result != 0 || aborted)
-                    failed.Add(path);
+                FlushRecycleBatch(batch, ownerWindow, failed);
+                batch.Clear();
+                chars = 0;
             }
-            catch
-            {
-                failed.Add(path);
-            }
+
+            batch.Add(path);
+            chars += cost;
         }
 
+        if (batch.Count > 0)
+            FlushRecycleBatch(batch, ownerWindow, failed);
+
         return failed;
+    }
+
+    /// <summary>
+    /// Verschiebt einen Stapel auf einmal; scheitert er, wird er einzeln nachgearbeitet, damit
+    /// nur die wirklich betroffenen Pfade in <paramref name="failed"/> landen (eine gesperrte Datei
+    /// darf nicht den ganzen Stapel als fehlgeschlagen melden).
+    /// </summary>
+    private static void FlushRecycleBatch(List<string> batch, IntPtr ownerWindow, List<string> failed)
+    {
+        if (batch.Count == 1)
+        {
+            if (!RunRecycleOperation(batch[0] + "\0\0", ownerWindow))
+                failed.Add(batch[0]);
+            return;
+        }
+
+        if (RunRecycleOperation(string.Join('\0', batch) + "\0\0", ownerWindow))
+            return;
+
+        // Stapel gescheitert -> einzeln nachfassen. WICHTIG: SHFileOperation arbeitet den Stapel bis
+        // zum Fehler ab, ein Teil liegt also unter Umständen schon im Papierkorb. Ein blindes
+        // Wiederholen würde für diese Pfade fehlschlagen (Datei ist weg) und sie fälschlich als
+        // Fehlschlag melden – im Bereinigungslauf hieße das: erfolgreich gesicherte Dateien gelten
+        // als übersprungen und fehlen im Undo-Manifest. Was nicht mehr auf der Platte liegt, wurde
+        // verschoben und ist erledigt.
+        foreach (string path in batch)
+        {
+            if (!File.Exists(path) && !Directory.Exists(path)) continue;
+
+            if (!RunRecycleOperation(path + "\0\0", ownerWindow))
+                failed.Add(path);
+        }
+    }
+
+    /// <summary>
+    /// Führt eine FO_DELETE-Operation für die (doppelt null-terminierte) Pfadliste aus.
+    /// Gibt <c>true</c> zurück, wenn ALLE darin enthaltenen Objekte verschoben wurden.
+    /// </summary>
+    private static bool RunRecycleOperation(string pFrom, IntPtr ownerWindow)
+    {
+        try
+        {
+            int result = -1;
+            bool aborted = true;
+
+            RunSta(() =>
+            {
+                var op = new SHFILEOPSTRUCT
+                {
+                    hwnd = ownerWindow,
+                    wFunc = FO_DELETE,
+                    pFrom = pFrom,
+                    fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_WANTNUKEWARNING
+                };
+
+                result = SHFileOperation(ref op);
+                aborted = op.fAnyOperationsAborted;
+            });
+
+            return result == 0 && !aborted;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     // ---- Inhalt auflisten ---------------------------------------------------
@@ -280,6 +455,49 @@ public static class RecycleBin
         catch { ok = false; }
 
         return ok;
+    }
+
+    // ---- Wiederherstellen (für das App-Undo) --------------------------------
+
+    /// <summary>
+    /// Spielt einen zuvor in den Papierkorb verschobenen Eintrag an seinen Originalort zurück:
+    /// verschiebt die $R-Daten nach <paramref name="originalPath"/> und entfernt die $I-Metadatei.
+    /// Vorhandene Dateien am Ziel werden NICHT überschrieben (dann false). True bei Erfolg.
+    /// </summary>
+    public static bool RestoreEntry(string? dataPath, string? metaPath, string originalPath)
+    {
+        if (string.IsNullOrEmpty(dataPath) || string.IsNullOrEmpty(originalPath)) return false;
+
+        try
+        {
+            bool isDir = Directory.Exists(dataPath);
+            bool isFile = File.Exists(dataPath);
+            if (!isDir && !isFile) return false;
+
+            // Ziel darf nicht existieren (kein Überschreiben beim Undo).
+            if (File.Exists(originalPath) || Directory.Exists(originalPath)) return false;
+
+            string? parent = Path.GetDirectoryName(originalPath);
+            if (!string.IsNullOrEmpty(parent))
+                Directory.CreateDirectory(parent);
+
+            if (isDir) Directory.Move(dataPath, originalPath);
+            else File.Move(dataPath, originalPath);
+        }
+        catch
+        {
+            return false;
+        }
+
+        // $I-Metadatei entfernen; scheitert das, ist der Restore trotzdem erfolgt.
+        try
+        {
+            if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
+                File.Delete(metaPath);
+        }
+        catch { /* verwaiste $I-Datei ist unkritisch */ }
+
+        return true;
     }
 
     // ---- Gesamtgröße / komplett leeren --------------------------------------

@@ -1,5 +1,7 @@
 using System.IO;
 using OpenClean.Models;
+using OpenClean.Services.Integrity;
+using OpenClean.Services.Safety;
 
 namespace OpenClean.Services;
 
@@ -16,9 +18,16 @@ public sealed class CleanupReport
     /// </summary>
     public List<string> Deleted { get; } = new();
 
-    public string Summary =>
-        Loc.T("cleanup.report.summary", DeletedCount, ByteFormatter.Format(FreedBytes)) +
-        (Skipped.Count > 0 ? Loc.T("cleanup.report.skipped", Skipped.Count) : "");
+    /// <summary>
+    /// True, wenn gar nicht gelöscht wurde, weil die Integritätsprüfung angeschlagen hat
+    /// (OPCL-20). Unterscheidet „nichts zu tun" von „aus Sicherheitsgründen verweigert".
+    /// </summary>
+    public bool Blocked { get; init; }
+
+    public string Summary => Blocked
+        ? Loc.T("integrity.blocked.summary")
+        : Loc.T("cleanup.report.summary", DeletedCount, ByteFormatter.Format(FreedBytes)) +
+          (Skipped.Count > 0 ? Loc.T("cleanup.report.skipped", Skipped.Count) : "");
 }
 
 /// <summary>
@@ -32,16 +41,50 @@ public sealed class CleanerService
     /// Synchron; vom ViewModel per Task.Run aufgerufen.
     /// </summary>
     public CleanupReport Clean(IEnumerable<CleanupCategory> categories)
-        => Clean(categories, null);
+        => Clean(categories, null, null);
 
     /// <summary>
     /// Wie <see cref="Clean(IEnumerable{CleanupCategory})"/>, meldet aber pro gelöschtem/
     /// übersprungenem Item den Fortschritt (aktueller Pfad + Prozent).
     /// </summary>
     public CleanupReport Clean(IEnumerable<CleanupCategory> categories, IProgress<CleanupProgress>? progress)
+        => Clean(categories, progress, null);
+
+    /// <summary>
+    /// Kernmethode mit optionalem Sicherheitskontext. Die gemeinsame Klammer aller Bereinigungs-
+    /// pfade: Ist ein <paramref name="safety"/>-Kontext gesetzt, laufen alle Datei-Löschungen über
+    /// dessen <see cref="BackupSession"/> (Undo möglich); optional erstellt der Dienst dann auch den
+    /// Wiederherstellungspunkt selbst (für einen unbeaufsichtigten Aufrufer ohne UI).
+    ///
+    /// <para>Interaktiver Aufruf: das ViewModel erstellt den Wiederherstellungspunkt vorab (mit
+    /// UI-Rückfrage bei Fehlern) und reicht eine fertige <see cref="BackupSession"/> herein, die es
+    /// danach selbst committet.</para>
+    ///
+    /// <para>Ohne Kontext (<paramref name="safety"/> = null): unverändertes, direktes Löschen wie
+    /// bisher – z. B. der über den Choke Point laufende, von einem eigenen Sicherheitsmodell
+    /// begleitete Aufruf oder Tests. Der Aufrufer bleibt Eigentümer einer evtl. übergebenen Sitzung
+    /// und committet sie selbst.</para>
+    /// </summary>
+    public CleanupReport Clean(IEnumerable<CleanupCategory> categories, IProgress<CleanupProgress>? progress, CleanupSafetyContext? safety)
     {
+        // Sperre bei erkannter Manipulation (OPCL-20). Bewusst HIER und nicht nur im ViewModel:
+        // AutoCleanService ruft diese Methode für den unbeaufsichtigten --auto-Lauf direkt auf.
+        if (IntegrityState.IsBlocked)
+            return new CleanupReport { Blocked = true };
+
+        // Optionaler unbeaufsichtigter Aufrufer, der den Wiederherstellungspunkt hier erzeugen lässt.
+        if (safety?.CreateRestorePointHere == true)
+            CleanupSafety.EnsureRestorePoint("cleanup"); // best effort, kein Abbruch (kein UI)
+
+        BackupSession? session = safety?.Session;
+
         var report = new CleanupReport();
-        var list = categories.ToList();
+
+        // Papierkorb-Kategorien ZUERST verarbeiten: Wird der Papierkorb im selben Lauf geleert,
+        // muss das geschehen, BEVOR mit PreferRecycle gesicherte Temp-Dateien dorthin verschoben
+        // werden – sonst würde das Leeren die eben erstellten Backups wieder vernichten.
+        // OrderBy ist stabil, die übrige Reihenfolge bleibt also erhalten.
+        var list = categories.OrderBy(c => c.Kind == CleanupKind.RecycleBin ? 0 : 1).ToList();
 
         // Gesamtzahl der ausgewählten Items der aktivierten Kategorien (für Prozentanzeige).
         int total = list.Where(c => c.IsEnabled).Sum(c => c.Items.Count(i => i.IsSelected));
@@ -64,10 +107,19 @@ public sealed class CleanerService
                 continue;
             }
 
-            foreach (var item in category.Items.Where(i => i.IsSelected).ToList())
+            var selectedItems = category.Items.Where(i => i.IsSelected).ToList();
+
+            // Mit Sicherheitsnetz gestapelt löschen (ein Shell-Aufruf je Stapel statt je Datei).
+            if (session is not null)
+            {
+                done = DeleteItemsBatched(report, selectedItems, session, progress, done, total);
+                continue;
+            }
+
+            foreach (var item in selectedItems)
             {
                 progress?.Report(new CleanupProgress { CurrentPath = item.FullPath, Done = done, Total = total });
-                DeleteItem(report, item);
+                DeleteItem(report, item, session);
                 done++;
                 progress?.Report(new CleanupProgress { CurrentPath = item.FullPath, Done = done, Total = total });
             }
@@ -120,7 +172,76 @@ public sealed class CleanerService
         }
     }
 
-    private static void DeleteItem(CleanupReport report, ScanItem item)
+    // Objekte je Stapel an die Backup-Sitzung geben. Die Größe bestimmt, wie fein der Fortschritt
+    // gemeldet wird (je Stapel, nicht je Datei) – 128 hält die Anzeige flüssig und amortisiert die
+    // Kosten des Shell-Aufrufs praktisch vollständig.
+    private const int SafeDeleteBatchSize = 128;
+
+    /// <summary>
+    /// Löscht die ausgewählten Objekte einer Kategorie gesichert in Stapeln. Gibt den fortgeschriebenen
+    /// <paramref name="done"/>-Zähler zurück.
+    /// </summary>
+    private static int DeleteItemsBatched(CleanupReport report, List<ScanItem> items, BackupSession session,
+        IProgress<CleanupProgress>? progress, int done, int total)
+    {
+        var batch = new List<ScanItem>(SafeDeleteBatchSize);
+
+        foreach (var item in items)
+        {
+            // Der Schutzfilter bleibt eine Einzelfallprüfung und läuft VOR dem Stapel.
+            if (!IsSafeToDelete(item.FullPath))
+            {
+                report.Skipped.Add(item.FullPath);
+                done++;
+                progress?.Report(new CleanupProgress { CurrentPath = item.FullPath, Done = done, Total = total });
+                continue;
+            }
+
+            batch.Add(item);
+            if (batch.Count < SafeDeleteBatchSize) continue;
+
+            done = FlushDeleteBatch(report, batch, session, progress, done, total);
+            batch.Clear();
+        }
+
+        if (batch.Count > 0)
+            done = FlushDeleteBatch(report, batch, session, progress, done, total);
+
+        return done;
+    }
+
+    private static int FlushDeleteBatch(CleanupReport report, List<ScanItem> batch, BackupSession session,
+        IProgress<CleanupProgress>? progress, int done, int total)
+    {
+        progress?.Report(new CleanupProgress { CurrentPath = batch[0].FullPath, Done = done, Total = total });
+
+        var requests = new List<SafeDeleteRequest>(batch.Count);
+        foreach (var item in batch)
+            requests.Add(new SafeDeleteRequest(item.FullPath, item.IsDirectory, item.SizeBytes));
+
+        var outcomes = session.TryDeleteMany(requests, SafeDeleteStrategy.PreferRecycle);
+
+        for (int i = 0; i < batch.Count; i++)
+        {
+            var item = batch[i];
+            if (outcomes[i] == SafeDeleteOutcome.Deleted)
+            {
+                report.DeletedCount++;
+                report.FreedBytes += item.SizeBytes;
+                report.Deleted.Add(item.FullPath);
+            }
+            else
+            {
+                report.Skipped.Add(item.FullPath);
+            }
+            done++;
+        }
+
+        progress?.Report(new CleanupProgress { CurrentPath = batch[^1].FullPath, Done = done, Total = total });
+        return done;
+    }
+
+    private static void DeleteItem(CleanupReport report, ScanItem item, BackupSession? session)
     {
         if (!IsSafeToDelete(item.FullPath))
         {
@@ -128,6 +249,24 @@ public sealed class CleanerService
             return;
         }
 
+        // Mit aktivem Sicherheitsnetz: gesichert löschen (Temp/Cache -> Papierkorb, sonst Backup-Kopie).
+        if (session is not null)
+        {
+            var outcome = session.TryDelete(item.FullPath, item.IsDirectory, item.SizeBytes, SafeDeleteStrategy.PreferRecycle);
+            if (outcome == SafeDeleteOutcome.Deleted)
+            {
+                report.DeletedCount++;
+                report.FreedBytes += item.SizeBytes;
+                report.Deleted.Add(item.FullPath);
+            }
+            else
+            {
+                report.Skipped.Add(item.FullPath);
+            }
+            return;
+        }
+
+        // Ohne Sicherheitsnetz (Backup abgeschaltet): direktes, endgültiges Löschen wie bisher.
         try
         {
             if (item.IsDirectory)

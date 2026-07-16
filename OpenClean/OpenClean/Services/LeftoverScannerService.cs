@@ -1,6 +1,8 @@
 using System.IO;
 using Microsoft.Win32;
 using OpenClean.Models;
+using OpenClean.Services.Integrity;
+using OpenClean.Services.Safety;
 
 namespace OpenClean.Services;
 
@@ -148,8 +150,20 @@ public sealed class LeftoverScannerService
 
     /// <summary>Löscht die ausgewählten Reste (mit Sicherheits-Guards) und meldet das Ergebnis.</summary>
     public LeftoverCleanupResult DeleteSelected(IEnumerable<LeftoverItem> items)
+        => DeleteSelected(items, session: null);
+
+    /// <summary>
+    /// Löscht die ausgewählten Reste (mit Sicherheits-Guards) und meldet das Ergebnis. Ist
+    /// <paramref name="session"/> gesetzt, werden Ordner-Reste (Nutzerdaten) zuvor in die
+    /// Backup-Sitzung gesichert, sodass sie über Undo wiederhergestellt werden können.
+    /// Registry-Schlüssel bleiben davon unberührt (die deckt der Wiederherstellungspunkt ab).
+    /// </summary>
+    public LeftoverCleanupResult DeleteSelected(IEnumerable<LeftoverItem> items, BackupSession? session)
     {
         var result = new LeftoverCleanupResult();
+
+        // Sperre bei erkannter Manipulation (OPCL-20): nichts löschen, leeres Ergebnis melden.
+        if (IntegrityState.IsBlocked) return result;
 
         foreach (var item in items.Where(i => i.IsSelected))
         {
@@ -158,9 +172,23 @@ public sealed class LeftoverScannerService
                 if (item.Kind == LeftoverKind.Folder)
                 {
                     if (!IsSafeFolder(item.Path) || !Directory.Exists(item.Path)) continue;
-                    Directory.Delete(item.Path, recursive: true);
-                    result.DeletedCount++;
-                    result.FreedBytes += item.SizeBytes;
+
+                    if (session is not null)
+                    {
+                        // Nutzerdaten zuerst sichern, dann löschen (Undo-fähig).
+                        if (session.TryDelete(item.Path, isDirectory: true, item.SizeBytes,
+                                SafeDeleteStrategy.PreferBackup) == SafeDeleteOutcome.Deleted)
+                        {
+                            result.DeletedCount++;
+                            result.FreedBytes += item.SizeBytes;
+                        }
+                    }
+                    else
+                    {
+                        Directory.Delete(item.Path, recursive: true);
+                        result.DeletedCount++;
+                        result.FreedBytes += item.SizeBytes;
+                    }
                 }
                 else if (DeleteRegistryKey(item.Path))
                 {

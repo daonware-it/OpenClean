@@ -2,6 +2,7 @@ using System;
 using System.Windows.Media;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 
 namespace OpenClean.ViewModels;
 
@@ -40,7 +41,8 @@ public sealed class UninstallItemViewModel : ViewModelBase
 
     public string Name => Model.Name;
     public string Version => Model.Version;
-    public bool CanUninstall => Model.CanUninstall;
+    // Bei erkannter Manipulation (OPCL-20) gesperrt (UninstallerService sperrt zusätzlich selbst).
+    public bool CanUninstall => Model.CanUninstall && !IntegrityState.IsBlocked;
 
     public string PublisherDisplay =>
         string.IsNullOrWhiteSpace(Model.Publisher) ? Loc.T("uninstall.publisher.unknown") : Model.Publisher;

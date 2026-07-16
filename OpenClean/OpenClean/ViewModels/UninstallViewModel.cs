@@ -7,6 +7,7 @@ using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
+using OpenClean.Services.Safety;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -506,15 +507,32 @@ public sealed class UninstallViewModel : ViewModelBase
             Loc.T("uninstall.leftover.action"));
         if (!confirmed) return;
 
+        // Sicherheitsnetz vorbereiten (Wiederherstellungspunkt + Datei-Backup/Undo).
+        // Läuft VOR dem IsBusy-Wechsel, damit ein Abbruch den Zustand unberührt lässt.
+        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(Application.Current?.MainWindow, "leftover");
+        if (!prep.Proceed)
+        {
+            StatusText = Loc.T("safety.aborted");
+            return;
+        }
+
         IsBusy = true;
         ProgressIsIndeterminate = true;
         StatusText = Loc.T("uninstall.leftover.removing");
 
-        var result = await Task.Run(() => _leftoverScanner.DeleteSelected(selected));
-
-        ClearLeftovers();
-        IsBusy = false;
-        StatusText = Loc.T("uninstall.leftover.done", result.DeletedCount, ByteFormatter.Format(result.FreedBytes));
+        BackupSession? session = prep.Session;
+        try
+        {
+            var result = await Task.Run(() => _leftoverScanner.DeleteSelected(selected, session));
+            ClearLeftovers();
+            StatusText = Loc.T("uninstall.leftover.done", result.DeletedCount, ByteFormatter.Format(result.FreedBytes));
+        }
+        finally
+        {
+            // Manifest IMMER schreiben (auch bei unerwartetem Fehler); Commit ist idempotent.
+            session?.Commit();
+            IsBusy = false;
+        }
     }
 
     private void ClearLeftovers()

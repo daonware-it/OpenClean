@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using OpenClean.Models;
+using OpenClean.Services.Integrity;
 
 namespace OpenClean.Services;
 
@@ -40,6 +41,11 @@ public sealed class ScheduleTaskService
     /// </summary>
     public bool Register(ScheduleSettings schedule)
     {
+        // Sperre bei erkannter Manipulation (OPCL-20): keine neue unbeaufsichtigte Aufgabe
+        // anlegen. Unregister bleibt bewusst OHNE Sperre – eine bestehende Aufgabe zu
+        // entfernen ist sicherheitstechnisch immer erwünscht.
+        if (IntegrityState.IsBlocked) return false;
+
         string? exe = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(exe)) return false;
 
@@ -167,12 +173,13 @@ $@"<?xml version=""1.0"" encoding=""UTF-16""?>
     };
 
     /// <summary>XML-escaped einen Textwert (Pfade, Benutzernamen) für die Task-Definition.</summary>
-    private static string X(string value) => System.Security.SecurityElement.Escape(value) ?? value;
+    internal static string X(string value) => System.Security.SecurityElement.Escape(value) ?? value;
 
     private static int Clamp(int value, int min, int max)
         => value < min ? min : value > max ? max : value;
 
-    private static (int exitCode, string output) RunSchtasks(IEnumerable<string> args)
+    /// <summary>Ruft <c>schtasks.exe</c> auf; wirft nie (Fehler => Exit-Code -1).</summary>
+    internal static (int exitCode, string output) RunSchtasks(IEnumerable<string> args)
     {
         try
         {

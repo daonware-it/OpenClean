@@ -3,6 +3,7 @@ using System.Text;
 using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Integrity;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -83,7 +84,9 @@ public sealed class PrivacyViewModel : ViewModelBase
         private set => SetProperty(ref _hasReport, value);
     }
 
-    public bool CanClean => _hasScanned && !IsBusy && SelectedCount > 0;
+    // Bei erkannter Manipulation (OPCL-20) gesperrt. Die Privacy-Provider löschen direkt,
+    // ohne über einen der abgesicherten Services zu laufen – hier ist das der Choke Point.
+    public bool CanClean => _hasScanned && !IsBusy && SelectedCount > 0 && !IntegrityState.IsBlocked;
     public bool CanChangeSelection => !IsBusy && Groups.Any(g => g.Items.Count > 0);
 
     public int SelectedCount => Groups.Sum(g => g.SelectedCount);
@@ -160,6 +163,15 @@ public sealed class PrivacyViewModel : ViewModelBase
 
     private async Task CleanAsync()
     {
+        // Zweite Verteidigungslinie neben CanClean: die Privacy-Provider löschen selbst,
+        // ohne über einen der abgesicherten Services zu laufen.
+        if (IntegrityState.IsBlocked)
+        {
+            MessageBox.Show(Loc.T("integrity.blocked.action"), "OpenClean",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         // Nur Gruppen mit tatsächlich ausgewählten Einträgen.
         var affected = Groups.Where(g => g.SelectedCount > 0).ToList();
         if (affected.Count == 0) return;
@@ -172,6 +184,16 @@ public sealed class PrivacyViewModel : ViewModelBase
 
         IsBusy = true;
         HasReport = false;
+
+        // Sicherheitsnetz: Vor dem Löschen echter Nutzerdaten einen Wiederherstellungspunkt anlegen.
+        // Bricht der Nutzer am Fehler-Gate ab, wird nichts gelöscht.
+        if (!await SafetyPrompt.EnsureRestorePointAsync(Application.Current?.MainWindow, s => StatusText = s))
+        {
+            StatusText = Loc.T("safety.aborted");
+            IsBusy = false;
+            return;
+        }
+
         StatusText = Loc.T("privacy.status.cleaning");
 
         // Auswahl je Gruppe festhalten (Snapshot), dann im Hintergrund löschen.

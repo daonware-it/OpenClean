@@ -41,6 +41,25 @@ public sealed class AppSettings
     /// Verzögerung eingerichtet ist; jeder Datensatz entspricht genau einer geplanten Aufgabe.
     /// </summary>
     public List<DelayedStartupItem> DelayedStartup { get; set; } = new();
+
+    /// <summary>
+    /// Sicherheitsnetze für Bereinigungsaktionen (Wiederherstellungspunkt + Datei-Backup/Undo).
+    /// Immer vorhanden (Defaults), damit ältere settings.json ohne diesen Block laden.
+    /// </summary>
+    public SafetySettings Safety { get; set; } = new();
+}
+
+/// <summary>
+/// Einstellungen der Sicherheitsnetze vor Bereinigungsaktionen. Beide Netze sind standardmäßig
+/// aktiv und lassen sich einzeln abschalten.
+/// </summary>
+public sealed class SafetySettings
+{
+    /// <summary>Vor jeder systemändernden Bereinigung automatisch einen Windows-Wiederherstellungspunkt erstellen.</summary>
+    public bool CreateRestorePoint { get; set; } = true;
+
+    /// <summary>Zu löschende Dateien vor dem Löschen sichern, damit sich der Durchlauf rückgängig machen lässt.</summary>
+    public bool BackupBeforeDelete { get; set; } = true;
 }
 
 /// <summary>

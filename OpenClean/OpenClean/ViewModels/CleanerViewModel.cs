@@ -4,6 +4,7 @@ using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
+using OpenClean.Services.Safety;
 using OpenClean.Views;
 
 namespace OpenClean.ViewModels;
@@ -30,6 +31,9 @@ public sealed class CleanerViewModel : ViewModelBase
     private string _lastReportText = "";
     private bool _hasReport;
 
+    /// <summary>Id des zuletzt gesicherten Bereinigungs-Durchlaufs – Grundlage des „Rückgängig"-Buttons.</summary>
+    private string? _lastBackupSessionId;
+
     public ObservableCollection<CleanupCategory> Categories { get; } = new();
 
     /// <summary>Untergeordnetes ViewModel des Große-Dateien-Tabs.</summary>
@@ -37,6 +41,7 @@ public sealed class CleanerViewModel : ViewModelBase
 
     public AsyncRelayCommand ScanCommand { get; }
     public AsyncRelayCommand CleanCommand { get; }
+    public AsyncRelayCommand UndoLastCommand { get; }
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand DeselectAllCommand { get; }
     public RelayCommand ShowCategoriesCommand { get; private set; } = null!;
@@ -56,6 +61,7 @@ public sealed class CleanerViewModel : ViewModelBase
 
         ScanCommand = new AsyncRelayCommand(_ => ScanAsync());
         CleanCommand = new AsyncRelayCommand(_ => CleanAsync(), _ => CanClean);
+        UndoLastCommand = new AsyncRelayCommand(_ => UndoLastAsync(), _ => CanUndoLast);
         SelectAllCommand = new RelayCommand(_ => SetAllSelection(true), _ => CanChangeSelection);
         DeselectAllCommand = new RelayCommand(_ => SetAllSelection(false), _ => CanChangeSelection);
         ShowCategoriesCommand = new RelayCommand(_ => IsLargeFilesTab = false);
@@ -111,9 +117,11 @@ public sealed class CleanerViewModel : ViewModelBase
             {
                 ScanCommand.RaiseCanExecuteChanged();
                 CleanCommand.RaiseCanExecuteChanged();
+                UndoLastCommand.RaiseCanExecuteChanged();
                 SelectAllCommand.RaiseCanExecuteChanged();
                 DeselectAllCommand.RaiseCanExecuteChanged();
                 OnPropertyChanged(nameof(CanChangeSelection));
+                OnPropertyChanged(nameof(CanUndoLast));
             }
         }
     }
@@ -158,6 +166,9 @@ public sealed class CleanerViewModel : ViewModelBase
         get => _hasReport;
         private set => SetProperty(ref _hasReport, value);
     }
+
+    /// <summary>True, wenn der letzte Durchlauf gesichert wurde und rückgängig gemacht werden kann.</summary>
+    public bool CanUndoLast => _lastBackupSessionId is not null && !IsBusy;
 
     // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) bleibt der Scan nutzbar,
     // der Bereinigen-Knopf aber deaktiviert. CleanerService sperrt zusätzlich selbst.
@@ -270,6 +281,19 @@ public sealed class CleanerViewModel : ViewModelBase
         ScanProgressText = Loc.T("cleaner.confirm.preparing");
         ScanEtaText = "";
 
+        // Sicherheitsnetze VOR dem Löschen: Wiederherstellungspunkt (mit Rückfrage bei Fehlschlag)
+        // und Backup-Sitzung. Bricht der Nutzer am Gate ab, wird nichts gelöscht.
+        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(
+            Application.Current?.MainWindow, "cleanup", msg => ScanProgressText = msg);
+
+        if (!prep.Proceed)
+        {
+            IsBusy = false;
+            StatusText = Loc.T("safety.aborted");
+            ScanProgressText = "";
+            return;
+        }
+
         // IProgress auf dem UI-Thread → Callbacks marshallen automatisch zurück.
         var progress = new Progress<CleanupProgress>(p =>
         {
@@ -281,15 +305,57 @@ public sealed class CleanerViewModel : ViewModelBase
         });
 
         var snapshot = Categories.ToList();
-        CleanupReport report = await Task.Run(() => _cleaner.Clean(snapshot, progress));
+        var safety = new CleanupSafetyContext { Session = prep.Session, CreateRestorePointHere = false };
+        try
+        {
+            CleanupReport report = await Task.Run(() => _cleaner.Clean(snapshot, progress, safety));
 
-        // Nach dem Löschen frisch scannen, damit die Liste den echten Zustand zeigt.
+            // Undo-Ziel merken (nur wenn wirklich etwas gesichert wurde).
+            _lastBackupSessionId = (prep.Session is not null && prep.Session.Count > 0) ? prep.Session.Id : null;
+
+            // Nach dem Löschen frisch scannen, damit die Liste den echten Zustand zeigt.
+            await ScanAsync();
+
+            StatusText = report.Summary;
+            LastReportText = Loc.T("cleaner.report", report.DeletedCount, ByteFormatter.Format(report.FreedBytes))
+                + (report.Skipped.Count > 0 ? Loc.T("cleaner.report.skipped", report.Skipped.Count) : "");
+            HasReport = true;
+        }
+        finally
+        {
+            // Manifest IMMER schreiben (auch bei unerwartetem Fehler) – sonst wären bereits gelöschte
+            // Dateien ohne Undo und der Ordner würde von der Retention nie aufgeräumt. Commit ist idempotent.
+            prep.Session?.Commit();
+            // UI nie gesperrt zurücklassen (ScanAsync setzt IsBusy im Normalfall bereits zurück).
+            if (IsBusy) IsBusy = false;
+            OnPropertyChanged(nameof(CanUndoLast));
+            UndoLastCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    /// <summary>Macht den zuletzt gesicherten Bereinigungs-Durchlauf rückgängig (stellt die Dateien wieder her).</summary>
+    private async Task UndoLastAsync()
+    {
+        string? id = _lastBackupSessionId;
+        if (id is null) return;
+
+        IsBusy = true;
+        StatusText = Loc.T("safety.undo.running");
+
+        UndoResult result = await Task.Run(() => BackupService.Instance.Restore(id));
+
+        _lastBackupSessionId = null;
+        HasReport = false;
+
+        // Frisch scannen, damit die wiederhergestellten Dateien wieder in der Vorschau auftauchen.
         await ScanAsync();
 
-        StatusText = report.Summary;
-        LastReportText = Loc.T("cleaner.report", report.DeletedCount, ByteFormatter.Format(report.FreedBytes))
-            + (report.Skipped.Count > 0 ? Loc.T("cleaner.report.skipped", report.Skipped.Count) : "");
-        HasReport = true;
+        IsBusy = false;
+        StatusText = result.Failed > 0
+            ? Loc.T("safety.undo.partial", result.Restored, result.Failed)
+            : Loc.T("safety.undo.done", result.Restored, ByteFormatter.Format(result.RestoredBytes));
+        OnPropertyChanged(nameof(CanUndoLast));
+        UndoLastCommand.RaiseCanExecuteChanged();
     }
 
     private void HookCategory(CleanupCategory category)

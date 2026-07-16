@@ -1,0 +1,199 @@
+<UserControl x:Class="OpenClean.Views.BackupHistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:OpenClean.Views"
+             xmlns:loc="clr-namespace:OpenClean.Services.Localization"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900"
+             Background="{DynamicResource BgBrush}"
+             FontFamily="{DynamicResource AppFont}">
+    <Grid Margin="32,10,32,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- Kopfbereich -->
+            <RowDefinition Height="Auto" />  <!-- Sicherheitsnetz-Schalter -->
+            <RowDefinition Height="Auto" />  <!-- Wiederherstellungspunkte -->
+            <RowDefinition Height="*" />     <!-- Gesicherte Durchläufe -->
+            <RowDefinition Height="Auto" />  <!-- Statusleiste -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== Header ===== -->
+        <Grid Grid.Row="0">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{loc:Loc safety.title}" Style="{StaticResource HeaderText}" FontSize="24" />
+                <TextBlock Text="{loc:Loc safety.subtitle}"
+                           Style="{StaticResource MutedText}" Margin="0,4,0,0" />
+            </StackPanel>
+            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RefreshCommand}"
+                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                          Fill="{x:Null}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M4 12 a8 8 0 1 1 2.3 5.6 M4 18 L4 13 L9 13" />
+                    <TextBlock Text="{loc:Loc common.refresh}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- ===== Einstellungen: Sicherheitsnetze ===== -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,20,0,0" Padding="22,16">
+            <StackPanel>
+                <TextBlock Text="{loc:Loc safety.settings.title}" FontWeight="SemiBold" FontSize="14" />
+                <!-- Wiederherstellungspunkt -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="{loc:Loc safety.settings.restorePoint}" FontWeight="Medium" />
+                        <TextBlock Text="{loc:Loc safety.settings.restorePoint.desc}"
+                                   Style="{StaticResource MutedText}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"
+                                  IsChecked="{Binding CreateRestorePoint, Mode=TwoWay}" />
+                </Grid>
+                <Border Height="1" Background="{DynamicResource BorderBrush}" Opacity="0.5" Margin="0,14,0,0" />
+                <!-- Datei-Backup -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="{loc:Loc safety.settings.backup}" FontWeight="Medium" />
+                        <TextBlock Text="{loc:Loc safety.settings.backup.desc}"
+                                   Style="{StaticResource MutedText}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"
+                                  IsChecked="{Binding BackupBeforeDelete, Mode=TwoWay}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Windows-Wiederherstellungspunkte (eigener Abschnitt) =====
+             Bewusst getrennt von den Backup-Durchläufen: Die Punkte entstehen unabhängig vom
+             Datei-Backup-Schalter, und ihr Zurücksetzen macht Windows selbst (rstrui.exe). -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,20,0,0" Padding="22,16">
+            <StackPanel>
+                <Grid>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{loc:Loc safety.points.title}" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Text="{Binding RestorePointsStatusText}" Style="{StaticResource MutedText}"
+                                   FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Command="{Binding DeleteOldRestorePointsCommand}"
+                                Content="{loc:Loc safety.points.deleteOld.action}" Margin="0,0,10,0" />
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Command="{Binding OpenSystemRestoreCommand}"
+                                Content="{loc:Loc safety.points.open}" />
+                    </StackPanel>
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding RestorePoints}" Margin="0,12,0,0"
+                              Visibility="{Binding HasRestorePoints, Converter={StaticResource BoolToVis}}">
+                    <ItemsControl.Template>
+                        <ControlTemplate TargetType="ItemsControl">
+                            <!-- Deckelt lange Punktlisten, damit der Abschnitt die Durchläufe darunter
+                                 nicht aus der Ansicht schiebt. -->
+                            <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </ItemsControl.Template>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,16,0">
+                                    <Path Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center"
+                                          Margin="0,0,10,0" Opacity="0.5" Fill="{x:Null}"
+                                          Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="2"
+                                          Data="M4 12 a8 8 0 1 1 2.3 5.6 M4 18 L4 13 L9 13" />
+                                    <TextBlock Text="{Binding Description}" VerticalAlignment="Center"
+                                               FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding SequenceText}" Style="{StaticResource MutedText}"
+                                               FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CreatedText}"
+                                               Style="{StaticResource MutedText}" FontSize="12"
+                                               VerticalAlignment="Center" />
+                                    <Button Command="{Binding DeleteCommand}" Margin="12,0,0,0"
+                                            Background="Transparent" BorderThickness="0" Padding="6,2"
+                                            Cursor="Hand" ToolTip="{loc:Loc safety.points.delete.action}">
+                                        <Path Width="12" Height="12" Stretch="Uniform" Fill="{x:Null}"
+                                              Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="2"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Data="M6 6 L18 18 M18 6 L6 18" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Liste der gesicherten Durchläufe ===== -->
+        <Grid Grid.Row="3" Margin="0,20,0,0">
+            <!-- Leerzustand -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Visibility="{Binding HasSessions, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                <Path Width="46" Height="46" Stretch="Uniform" HorizontalAlignment="Center" Opacity="0.35"
+                      Fill="{DynamicResource TextMutedBrush}"
+                      Data="M5 6 H19 L18 21 H6 Z M9 3 H15 V6 H9 Z M12 10 V17 M9 13 L12 10 L15 13" />
+                <TextBlock Text="{loc:Loc safety.history.empty}" Style="{StaticResource MutedText}"
+                           HorizontalAlignment="Center" Margin="0,14,0,0" />
+            </StackPanel>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding HasSessions, Converter={StaticResource BoolToVis}}">
+                <ItemsControl ItemsSource="{Binding Sessions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="20,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding AreaLabel}" FontWeight="SemiBold" FontSize="14" />
+                                            <TextBlock Text="{Binding CreatedText}" Style="{StaticResource MutedText}"
+                                                       FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Summary}" Style="{StaticResource MutedText}"
+                                                   FontSize="12.5" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding RestoreCommand}"
+                                                Content="{loc:Loc safety.undo.action}" />
+                                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DeleteCommand}"
+                                                Content="{loc:Loc safety.history.discard}" Margin="10,0,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ===== Statusleiste ===== -->
+        <Border Grid.Row="4" Background="{DynamicResource BgDeepBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
+                Margin="-32,14,-32,0" Padding="32,12">
+            <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
+                       FontSize="12.5" VerticalAlignment="Center" />
+        </Border>
+    </Grid>
+</UserControl>

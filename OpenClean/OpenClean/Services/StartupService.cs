@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Win32;
 using OpenClean.Models;
+using OpenClean.Services.Integrity;
 
 namespace OpenClean.Services;
 
@@ -32,10 +33,6 @@ public sealed class StartupService
     // Lazy gecachte Maps aus dem PackageManager: PFN -> DisplayName bzw. -> PublisherDisplayName.
     private Dictionary<string, string>? _packageDisplayNames;
     private Dictionary<string, string>? _packagePublishers;
-
-    // Cache pro Datei-Pfad -> verifizierter Authenticode-Herausgeber (Doppelarbeit vermeiden).
-    private readonly Dictionary<string, string> _exePublisherCache =
-        new(StringComparer.OrdinalIgnoreCase);
 
     private Dictionary<string, string> PackageDisplayNames
     {
@@ -357,35 +354,8 @@ public sealed class StartupService
         _packagePublishers = publishers;
     }
 
-    /// <summary>
-    /// Verifizierter Authenticode-Herausgeber einer EXE (Subject Common Name der Signatur),
-    /// gecacht pro Pfad. Leer bei unsignierten/nicht lesbaren Dateien.
-    /// </summary>
-    private string PublisherForExe(string? exePath)
-    {
-        if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
-            return "";
-
-        if (_exePublisherCache.TryGetValue(exePath, out var cached))
-            return cached;
-
-        string publisher = "";
-        try
-        {
-            // CreateFromSignedFile extrahiert das Authenticode-Zertifikat aus der Datei.
-            // Für dieses Szenario existiert kein nicht-veralteter Ersatz -> gezielt unterdrücken.
-#pragma warning disable SYSLIB0057
-            using var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(
-                System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(exePath));
-#pragma warning restore SYSLIB0057
-            publisher = cert.GetNameInfo(
-                System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, forIssuer: false) ?? "";
-        }
-        catch { /* unsigniert/nicht lesbar -> leer */ }
-
-        _exePublisherCache[exePath] = publisher;
-        return publisher;
-    }
+    /// <summary>Verifizierter Authenticode-Herausgeber einer EXE (gecacht, siehe <see cref="AuthenticodeService"/>).</summary>
+    private static string PublisherForExe(string? exePath) => AuthenticodeService.PublisherFor(exePath);
 
     private void ReadStartupFolder(List<StartupEntry> entries, string folder, StartupLocation location)
     {
@@ -429,6 +399,10 @@ public sealed class StartupService
     /// <summary>Setzt den Aktiviert-Status über die StartupApproved-Keys.</summary>
     public void SetEnabled(StartupEntry entry, bool enabled)
     {
+        // Sperre bei erkannter Manipulation (OPCL-20): keine Registry-Schreibvorgänge.
+        // Deckt auch DelayedStartupService mit ab, der hierüber deaktiviert.
+        if (IntegrityState.IsBlocked) return;
+
         // Per Gruppenrichtlinie gesetzte Einträge lassen sich nicht schalten -> nichts tun.
         if (!entry.CanToggle) return;
 
@@ -551,25 +525,35 @@ public sealed class StartupService
 
     // ---- Hilfsfunktionen ----------------------------------------------------
 
-    /// <summary>Extrahiert den EXE-Pfad aus einem (evtl. quotierten, mit Argumenten versehenen) Befehl.</summary>
-    private static string? ResolveExecutable(string command)
+    /// <summary>
+    /// Zerlegt einen Autostart-Befehl in Programm und Argumente. Umgebungsvariablen werden
+    /// expandiert; ein quotierter Pfad darf Leerzeichen enthalten. Leerer EXE-Teil, wenn der
+    /// Befehl leer ist.
+    /// </summary>
+    public static (string exe, string arguments) SplitCommand(string command)
     {
-        if (string.IsNullOrWhiteSpace(command)) return null;
+        if (string.IsNullOrWhiteSpace(command)) return ("", "");
         command = Environment.ExpandEnvironmentVariables(command).Trim();
 
-        string candidate;
         if (command.StartsWith('"'))
         {
             int end = command.IndexOf('"', 1);
-            candidate = end > 0 ? command.Substring(1, end - 1) : command.Trim('"');
-        }
-        else
-        {
-            int space = command.IndexOf(' ');
-            candidate = space > 0 ? command[..space] : command;
+            return end > 0
+                ? (command.Substring(1, end - 1), command[(end + 1)..].Trim())
+                : (command.Trim('"'), "");
         }
 
-        return File.Exists(candidate) ? candidate : null;
+        int space = command.IndexOf(' ');
+        return space > 0
+            ? (command[..space], command[(space + 1)..].Trim())
+            : (command, "");
+    }
+
+    /// <summary>Extrahiert den EXE-Pfad aus einem (evtl. quotierten, mit Argumenten versehenen) Befehl.</summary>
+    private static string? ResolveExecutable(string command)
+    {
+        var (exe, _) = SplitCommand(command);
+        return exe.Length > 0 && File.Exists(exe) ? exe : null;
     }
 
     /// <summary>Löst eine .lnk-Verknüpfung auf ihr Ziel auf (best effort, via WScript.Shell).</summary>

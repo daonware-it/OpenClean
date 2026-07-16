@@ -21,6 +21,7 @@ public enum AppSection
     Zeitplan,
     Deinstallation,
     Duplikate,
+    Wiederherstellen,
     Lizenz
 }
 
@@ -42,6 +43,7 @@ public sealed class MainViewModel : ViewModelBase
     public UpdaterViewModel Updater { get; } = new();
     public UninstallViewModel Uninstall { get; } = new();
     public DuplicatesViewModel Duplicates { get; } = new();
+    public BackupHistoryViewModel BackupHistory { get; } = new();
     public DashboardViewModel Dashboard { get; }
     public LicensePageViewModel License { get; } = new();
     public StorageAnalysisViewModel StorageAnalysis { get; } = new();
@@ -83,6 +85,7 @@ public sealed class MainViewModel : ViewModelBase
             _lockedSchedule?.Relocalize();
             Uninstall.Relocalize();
             Duplicates.Relocalize();
+            BackupHistory.Relocalize();
             License.Relocalize();
             StorageAnalysis.Relocalize();
         };
@@ -117,6 +120,10 @@ public sealed class MainViewModel : ViewModelBase
 
             if (value == AppSection.Uebersicht)
                 Dashboard.EnsureAnalyzed();
+
+            // Beim Öffnen des Wiederherstellen-Bereichs die Liste der Sicherungen aktualisieren.
+            if (value == AppSection.Wiederherstellen)
+                BackupHistory.Refresh();
 
             // Beim Öffnen des Premium-Bereichs bei Bedarf das Lizenz-Token im
             // Hintergrund erneuern (nie beim App-Start, nie blockierend).

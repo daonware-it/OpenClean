@@ -1,17 +1,19 @@
-; Inno-Setup-Skript für OpenClean (v1.0.0).
+; Inno-Setup-Skript für OpenClean (v1.2.0).
 ; Baut einen klassischen Installer aus dem self-contained Publish-Verzeichnis.
 ; Die installierte App enthält KEINE OpenClean.portable-Marker-Datei und nutzt
 ; daher %AppData%\OpenClean für ihre Einstellungen (Portable-Modus nur beim .zip).
 ;
 ; Aufruf (siehe .github\workflows\release.yml):
-;   ISCC.exe /DAppVersion=1.0.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
+;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
 ;
 ; Signierung: Der fertige Installer wird in der Release-Pipeline per Azure
 ; Trusted Signing signiert (siehe .github\workflows\release.yml). AppPublisher
 ; muss exakt dem bei der Org-Validierung eingetragenen Firmennamen entsprechen.
 
+; Nur der Rückfall für lokale Aufrufe ohne /DAppVersion – die Release-Pipeline reicht die
+; Version aus der .csproj herein. Muss zu <Version> in OpenClean.csproj passen.
 #ifndef AppVersion
-  #define AppVersion "1.0.1"
+  #define AppVersion "1.2.0"
 #endif
 
 #ifndef SourceDir

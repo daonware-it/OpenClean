@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using OpenClean.Contracts;
+using OpenClean.Services.Integrity;
 
 namespace OpenClean.Services.Licensing;
 
@@ -280,6 +281,11 @@ public sealed class PremiumService
     {
         try
         {
+            // Sperre bei erkannter Manipulation (OPCL-20). Steht bewusst VOR dem Dev-Override:
+            // In einem manipulierten Prozess darf überhaupt kein nachgeladener Code mehr in den
+            // Default-ALC gelangen – dieser läuft mit Adminrechten und lässt sich nicht entladen.
+            if (IntegrityState.IsBlocked) return null;
+
 #if DEBUG
             // Dev-Override (nur Debug-Builds): eine neben der EXE liegende Modul-DLL wird
             // OHNE Hash-Prüfung bevorzugt geladen. Das Premium-Repo kopiert sie per
@@ -292,16 +298,21 @@ public sealed class PremiumService
 #endif
             if (!File.Exists(ModulePath)) return null;
 
-            // Integritätsprüfung gegen den signierten Hash aus dem Lizenz-Token
-            // (verhindert das Unterschieben einer fremden/manipulierten DLL).
-            // Ohne Hash-Vorgabe (Dev-Token) entfällt die Prüfung.
-            if (!string.IsNullOrWhiteSpace(expectedSha256))
-            {
-                using var stream = File.OpenRead(ModulePath);
-                string actual = Convert.ToHexString(SHA256.HashData(stream));
-                if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
-                    return null;
-            }
+            // Zwei unabhängige Prüfungen, BEIDE müssen bestehen (OPCL-20). Die DLL liegt in
+            // einem beschreibbaren Ordner und wird mit Adminrechten in den Prozess geladen –
+            // hier ist der einzige Weg, auf dem OpenClean fremden Code nachlädt.
+            //
+            // 1. Authenticode: Ist die DLL gültig von DaonWare signiert? Deckt auch den Fall ab,
+            //    dass das Token gar keinen Hash mitbringt (früher entfiel die Prüfung dann ganz).
+            // 2. SHA-256 gegen den Hash aus dem signierten Lizenz-Token: bindet die DLL an genau
+            //    die Fassung, die der Lizenzserver für diese Lizenz vorgesehen hat.
+            //
+            // Die abgelehnte DLL wird bewusst NICHT gelöscht: Das Verweigern des Ladens ist der
+            // gesamte Schutz. Ein Löschen brächte nichts dazu und würde eine Schleife erzeugen
+            // (Server liefert dieselbe Datei erneut -> wieder gelöscht), außerdem zerstörte es
+            // eine Datei, die der Nutzer nicht wiederherstellen kann.
+            if (!IntegrityGuard.IsTrustedModule(ModulePath) || !HasExpectedHash(ModulePath, expectedSha256))
+                return null;
 
             return LoadFrom(ModulePath, license);
         }
@@ -310,6 +321,20 @@ public sealed class PremiumService
             // Beschädigte/inkompatible DLL -> Free-Zustand, nie ein Crash.
             return null;
         }
+    }
+
+    /// <summary>
+    /// True, wenn die Datei den im Lizenz-Token hinterlegten SHA-256 hat. Ein fehlender
+    /// Soll-Hash zählt NICHT mehr als bestanden: Ohne Hash trägt allein die Signatur, und die
+    /// wurde direkt davor geprüft – ein Token ohne Hash darf die Bindung nicht aufheben.
+    /// </summary>
+    private static bool HasExpectedHash(string path, string? expectedSha256)
+    {
+        if (string.IsNullOrWhiteSpace(expectedSha256)) return true;
+
+        using var stream = File.OpenRead(path);
+        string actual = Convert.ToHexString(SHA256.HashData(stream));
+        return string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Lädt das Modul-Assembly, prüft die Contract-Version und initialisiert es.</summary>

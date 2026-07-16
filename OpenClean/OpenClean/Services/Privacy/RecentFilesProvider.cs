@@ -1,5 +1,7 @@
 using System.IO;
 using OpenClean.Models;
+using OpenClean.Services;
+using OpenClean.Services.Safety;
 
 namespace OpenClean.Services.Privacy;
 
@@ -98,6 +100,13 @@ public sealed class RecentFilesProvider : IPrivacyProvider
     public Task<int> CleanAsync(IEnumerable<PrivacyItem> selected)
     {
         int deleted = 0;
+
+        // Nutzerdateien (.lnk / Jump-Lists): wenn das Datei-Backup aktiv ist, über eine
+        // Backup-Session löschen, damit ein Undo möglich bleibt. Sonst direkter Löschpfad.
+        var session = SettingsService.Instance.Current.Safety.BackupBeforeDelete
+            ? BackupService.Instance.BeginSession("privacy.recent")
+            : null;
+
         try
         {
             foreach (var item in selected)
@@ -107,17 +116,36 @@ public sealed class RecentFilesProvider : IPrivacyProvider
                     if (item.Tag is not RecentFileHandle handle) continue;
                     if (!File.Exists(handle.FullPath)) continue;
 
-                    // Schreibschutz aufheben, damit auch attributierte Dateien löschbar sind.
-                    try { File.SetAttributes(handle.FullPath, FileAttributes.Normal); }
-                    catch { /* nicht kritisch */ }
+                    if (session is not null)
+                    {
+                        // Dateigröße defensiv ermitteln (für Backup-Buchführung).
+                        long size;
+                        try { size = new FileInfo(handle.FullPath).Length; }
+                        catch { size = 0; }
 
-                    File.Delete(handle.FullPath);
-                    deleted++;
+                        var outcome = session.TryDelete(handle.FullPath, false, size, SafeDeleteStrategy.PreferBackup);
+                        if (outcome == SafeDeleteOutcome.Deleted)
+                            deleted++;
+                    }
+                    else
+                    {
+                        // Schreibschutz aufheben, damit auch attributierte Dateien löschbar sind.
+                        try { File.SetAttributes(handle.FullPath, FileAttributes.Normal); }
+                        catch { /* nicht kritisch */ }
+
+                        File.Delete(handle.FullPath);
+                        deleted++;
+                    }
                 }
                 catch { /* gesperrte/nicht löschbare Datei -> überspringen */ }
             }
         }
         catch { /* unerwarteter Fehler -> gelöschte Anzahl zurückgeben */ }
+        finally
+        {
+            // Backup-Session immer abschließen (auch im Fehlerfall).
+            session?.Commit();
+        }
 
         return Task.FromResult(deleted);
     }

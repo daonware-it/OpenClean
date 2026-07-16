@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using OpenClean.Models;
+using OpenClean.Services.Integrity;
 
 namespace OpenClean.Services;
 
@@ -21,6 +22,10 @@ public sealed class UninstallerService
     /// </summary>
     public async Task<bool> UninstallAsync(InstalledApp app, bool silent)
     {
+        // Sperre bei erkannter Manipulation (OPCL-20). Auch der Batch-Lauf aus dem
+        // Premium-Modul kommt hier vorbei.
+        if (IntegrityState.IsBlocked) return false;
+
         string? command = ChooseCommand(app, silent);
         if (string.IsNullOrWhiteSpace(command)) return false;
 
