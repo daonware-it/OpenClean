@@ -136,7 +136,6 @@ settings.local.json
 **/settings.local.json
 
 ## Interne Design-Specs / Brainstorming-Doku (nur lokal, nie auf GitHub)
-docs/superpowers/
-
-# Superpowers-Arbeitsdateien (Fortschritts-Ledger, Task-Briefs, Review-Pakete)
-.superpowers/
+docs/
+.*[power]*/
+REF/
