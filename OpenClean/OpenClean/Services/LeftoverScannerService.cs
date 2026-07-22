@@ -66,7 +66,7 @@ public sealed class LeftoverScannerService
             {
                 Path = app.InstallLocation,
                 Kind = LeftoverKind.Folder,
-                SizeBytes = DirectorySize(app.InstallLocation)
+                SizeBytes = DirectorySizeCalculator.Sum(app.InstallLocation)
             });
         }
 
@@ -86,7 +86,7 @@ public sealed class LeftoverScannerService
                 {
                     Path = child,
                     Kind = LeftoverKind.Folder,
-                    SizeBytes = DirectorySize(child)
+                    SizeBytes = DirectorySizeCalculator.Sum(child)
                 });
             }
         }
@@ -302,11 +302,7 @@ public sealed class LeftoverScannerService
         return true;
     }
 
-    private static string NormalizePath(string path)
-    {
-        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar); }
-        catch { return path.TrimEnd(Path.DirectorySeparatorChar); }
-    }
+    private static string NormalizePath(string path) => PathScope.Normalize(path);
 
     private static IEnumerable<string> SafeDirs(string parent)
     {
@@ -314,18 +310,4 @@ public sealed class LeftoverScannerService
         catch { return Array.Empty<string>(); }
     }
 
-    private static long DirectorySize(string dir)
-    {
-        long total = 0;
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-            {
-                try { total += new FileInfo(file).Length; }
-                catch { /* gesperrt -> überspringen */ }
-            }
-        }
-        catch { /* Zugriff verweigert -> Teilsumme */ }
-        return total;
-    }
 }

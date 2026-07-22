@@ -19,6 +19,15 @@ public sealed class AppSettings
     /// <summary>Theme-Name ("Dark" / "Light").</summary>
     public string? Theme { get; set; }
 
+    /// <summary>Modifier: Akzentfarbe von Windows übernehmen (überschreibt die Palette-Akzentfarbe).</summary>
+    public bool UseWindowsAccent { get; set; }
+
+    /// <summary>Modifier: transluzenter Mica/Acrylic-Fensterhintergrund (nur Windows 11+, sonst wirkungslos).</summary>
+    public bool UseMicaBackdrop { get; set; }
+
+    /// <summary>Animationen reduzieren (Scanline + Gaming-RGB-Farbrotation aus). Barrierefreiheit/Akku.</summary>
+    public bool ReduceMotion { get; set; }
+
     /// <summary>Zuletzt aktiver Bereich (Enum-Name von AppSection, z. B. "Bereinigung").</summary>
     public string? LastSection { get; set; }
 
@@ -47,6 +56,39 @@ public sealed class AppSettings
     /// Immer vorhanden (Defaults), damit ältere settings.json ohne diesen Block laden.
     /// </summary>
     public SafetySettings Safety { get; set; } = new();
+
+    /// <summary>
+    /// Cookie-Whitelist: Domains, deren Cookies bei der Privatsphäre-Bereinigung NIE gelöscht
+    /// werden (der Nutzer bleibt dort angemeldet). Leere Liste = keine Ausnahmen. Immer vorhanden
+    /// (Default), damit ältere settings.json ohne diesen Block problemlos laden.
+    /// </summary>
+    public List<string> CookieWhitelist { get; set; } = new();
+
+    /// <summary>Einstellungen für „Sicheres Löschen" (Pro). Immer vorhanden (Defaults).</summary>
+    public SecureDeleteSettings SecureDelete { get; set; } = new();
+
+    /// <summary>Einstellungen der Ähnlichkeits-Duplikatsuche (Pro). Immer vorhanden (Defaults).</summary>
+    public FuzzyDuplicateSettings FuzzyDuplicates { get; set; } = new();
+}
+
+/// <summary>
+/// Einstellungen des sicheren Löschens (Pro). Schlichtes DTO; die Normalisierung erfolgt
+/// beim Anwenden über <see cref="OpenClean.Models.SecureDeleteOptions.NormalizePasses"/>.
+/// </summary>
+public sealed class SecureDeleteSettings
+{
+    /// <summary>Zuletzt gewählte Anzahl der Überschreib-Durchgänge (erlaubt {1, 3, 7}).</summary>
+    public int Passes { get; set; } = 1;
+}
+
+/// <summary>
+/// Einstellungen der Ähnlichkeits-Duplikatsuche (Pro). Schlichtes DTO; das Clampen erfolgt
+/// beim Anwenden über <see cref="OpenClean.Models.FuzzyScanOptions.NormalizeThreshold"/>.
+/// </summary>
+public sealed class FuzzyDuplicateSettings
+{
+    /// <summary>Zuletzt gewählte Ähnlichkeitsschwelle in Prozent (50–100).</summary>
+    public int SimilarityThreshold { get; set; } = 90;
 }
 
 /// <summary>

@@ -1,8 +1,7 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -12,6 +11,8 @@ namespace OpenClean.ViewModels;
 public sealed class UpdaterViewModel : ViewModelBase
 {
     private readonly WingetService _service = new();
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _ui;
 
     // Ladelauf-Zähler: bricht veraltete Icon-Hintergrundläufe ab, sobald neu geladen wird.
     private int _loadGeneration;
@@ -28,8 +29,11 @@ public sealed class UpdaterViewModel : ViewModelBase
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand UpdateAllCommand { get; }
 
-    public UpdaterViewModel()
+    public UpdaterViewModel(IDialogService? dialogs = null, IUiDispatcher? ui = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+        _ui = ui ?? UiDispatcher.Default;
+
         RefreshCommand = new AsyncRelayCommand(_ => LoadAsync(), _ => !IsBusy);
         UpdateAllCommand = new AsyncRelayCommand(_ => UpdateAllAsync(), _ => !IsBusy && Updates.Count > 0);
 
@@ -135,8 +139,6 @@ public sealed class UpdaterViewModel : ViewModelBase
         var items = Updates.ToList();
         if (items.Count == 0) return;
 
-        var dispatcher = Application.Current?.Dispatcher;
-
         await Task.Run(() =>
         {
             List<(string Name, string IconPath)> installed;
@@ -159,7 +161,7 @@ public sealed class UpdaterViewModel : ViewModelBase
                 var icon = AppIconService.GetIcon(path);
                 if (icon is null || generation != _loadGeneration) continue;
 
-                dispatcher?.InvokeAsync(() =>
+                _ui.Post(() =>
                 {
                     if (generation == _loadGeneration)
                         item.SetIcon(icon);
@@ -217,8 +219,7 @@ public sealed class UpdaterViewModel : ViewModelBase
         // Schutz vor parallelen Updates (ein anderer Vorgang läuft bereits).
         if (IsBusy) return;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("updater.confirm.single", item.Name, item.CurrentVersion, item.AvailableVersion),
             Loc.T("updater.confirm.title"),
             Loc.T("updater.action.update"));
@@ -247,8 +248,7 @@ public sealed class UpdaterViewModel : ViewModelBase
     {
         if (Updates.Count == 0) return;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("updater.confirm.all", Updates.Count),
             Loc.T("updater.confirm.title"),
             Loc.T("updater.action.updateAll"));
@@ -290,6 +290,6 @@ public sealed class UpdaterViewModel : ViewModelBase
         }
     }
 
-    private static void ReportError(string message)
-        => MessageBox.Show(message, "OpenClean", MessageBoxButton.OK, MessageBoxImage.Warning);
+    private void ReportError(string message)
+        => _dialogs.ShowError(message);
 }

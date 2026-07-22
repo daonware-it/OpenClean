@@ -1,7 +1,6 @@
-using System.Windows;
 using OpenClean.Services;
 using OpenClean.Services.Licensing;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -19,10 +18,14 @@ public sealed class LockedScheduleViewModel : ViewModelBase
     public RelayCommand ActivateCommand { get; }
     public AsyncRelayCommand RetryModuleCommand { get; }
 
-    public LockedScheduleViewModel()
+    private readonly IDialogService _dialogs;
+
+    public LockedScheduleViewModel(IDialogService? dialogs = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+
         BuyCommand = new RelayCommand(_ => LicenseViewModel.OpenBuyPage());
-        ActivateCommand = new RelayCommand(_ => ActivationDialog.Show(Application.Current?.MainWindow));
+        ActivateCommand = new RelayCommand(_ => _dialogs.ActivateLicense());
         RetryModuleCommand = new AsyncRelayCommand(_ => RetryModuleAsync(), _ => !IsBusy);
     }
 

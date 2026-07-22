@@ -1,17 +1,23 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Windows;
 using System.Windows.Media.Imaging;
+using OpenClean.Contracts;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Duplicates;
 using OpenClean.Services.Integrity;
+using OpenClean.Services.Licensing;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.SecureDelete;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
 /// <summary>Strategie der automatischen Auswahl: welche Kopie je Gruppe BEHALTEN wird.</summary>
 public enum DuplicateKeepStrategy { Newest, Oldest, Smallest }
+
+/// <summary>Suchmodus: exakte (SHA-256, kostenlos) oder visuell ähnliche Bilder (Perceptual-Hash, Pro).</summary>
+public enum DuplicateScanMode { Exact, Similar }
 
 /// <summary>
 /// Bereich „Duplikate" (v0.10.0): findet exakte Duplikate (SHA-256) über einen oder
@@ -19,14 +25,19 @@ public enum DuplicateKeepStrategy { Newest, Oldest, Smallest }
 /// und löscht die manuell oder automatisch markierten Kopien – wobei pro Gruppe
 /// immer mindestens eine Kopie erhalten bleibt.
 /// </summary>
-public sealed class DuplicatesViewModel : ViewModelBase
+public sealed class DuplicatesViewModel : ScanViewModelBase
 {
     private readonly DuplicateScannerService _scanner = new();
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _ui;
 
-    private bool _isBusy;
     private string _statusText = "";
     private DuplicateGroupViewModel? _selectedGroup;
-    private CancellationTokenSource? _cts;
+
+    private DuplicateScanMode _scanMode = DuplicateScanMode.Exact;
+    private int _threshold;
+    private bool _useSecureDelete;
+    private int _passes;
 
     public ObservableCollection<string> Folders { get; } = new();
     public ObservableCollection<DuplicateGroupViewModel> Groups { get; } = new();
@@ -34,13 +45,15 @@ public sealed class DuplicatesViewModel : ViewModelBase
     public RelayCommand AddFolderCommand { get; }
     public RelayCommand RemoveFolderCommand { get; }
     public AsyncRelayCommand ScanCommand { get; }
-    public RelayCommand CancelCommand { get; }
     public RelayCommand AutoSelectCommand { get; }
     public RelayCommand ClearSelectionCommand { get; }
     public AsyncRelayCommand DeleteSelectedCommand { get; }
 
-    public DuplicatesViewModel()
+    public DuplicatesViewModel(IDialogService? dialogs = null, IUiDispatcher? ui = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+        _ui = ui ?? UiDispatcher.Default;
+
         AddFolderCommand = new RelayCommand(_ => AddFolders(), _ => !IsBusy);
         ScanCommand = new AsyncRelayCommand(_ => ScanAsync(), _ => !IsBusy && Folders.Count > 0);
         RemoveFolderCommand = new RelayCommand(p =>
@@ -49,7 +62,6 @@ public sealed class DuplicatesViewModel : ViewModelBase
             OnPropertyChanged(nameof(HasFolders));
             ScanCommand.RaiseCanExecuteChanged();
         }, _ => !IsBusy);
-        CancelCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsBusy);
         AutoSelectCommand = new RelayCommand(p => AutoSelect(ParseStrategy(p)), _ => !IsBusy && Groups.Count > 0);
         ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBusy && Groups.Count > 0);
         // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) gesperrt. Wichtig,
@@ -57,28 +69,34 @@ public sealed class DuplicatesViewModel : ViewModelBase
         DeleteSelectedCommand = new AsyncRelayCommand(_ => DeleteSelectedAsync(),
             _ => !IsBusy && SelectedCount > 0 && !IntegrityState.IsBlocked);
 
+        // Alle busy-abhängigen Commands zentral neu bewerten lassen (CancelCommand ist in der Basis
+        // bereits registriert).
+        RegisterBusyCommands(AddFolderCommand, RemoveFolderCommand, ScanCommand,
+            AutoSelectCommand, ClearSelectionCommand, DeleteSelectedCommand);
+
+        // Aus den Einstellungen übernommene Pro-Optionen (auf gültige Werte normalisiert).
+        _threshold = FuzzyScanOptions.NormalizeThreshold(
+            SettingsService.Instance.Current.FuzzyDuplicates.SimilarityThreshold);
+        _passes = SecureDeleteOptions.NormalizePasses(
+            SettingsService.Instance.Current.SecureDelete.Passes);
+
+        // Schloss-Badges der Pro-Features aktuell halten: nach Aktivierung/Widerruf neu bewerten.
+        PremiumService.Instance.Changed += (_, _) =>
+        {
+            void Update()
+            {
+                OnPropertyChanged(nameof(IsSimilarLocked));
+                OnPropertyChanged(nameof(IsSimilarUnlocked));
+                OnPropertyChanged(nameof(IsSecureDeleteLocked));
+            }
+            if (_ui.CheckAccess()) Update();
+            else _ui.Post(Update);
+        };
+
         StatusText = Loc.T("duplicates.status.idle");
     }
 
     // ---- Eigenschaften ------------------------------------------------------
-
-    public bool IsBusy
-    {
-        get => _isBusy;
-        private set
-        {
-            if (SetProperty(ref _isBusy, value))
-            {
-                AddFolderCommand.RaiseCanExecuteChanged();
-                RemoveFolderCommand.RaiseCanExecuteChanged();
-                ScanCommand.RaiseCanExecuteChanged();
-                CancelCommand.RaiseCanExecuteChanged();
-                AutoSelectCommand.RaiseCanExecuteChanged();
-                ClearSelectionCommand.RaiseCanExecuteChanged();
-                DeleteSelectedCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
 
     public string StatusText
     {
@@ -108,19 +126,101 @@ public sealed class DuplicatesViewModel : ViewModelBase
     public string SelectionSummary =>
         Loc.T("duplicates.selection.summary", SelectedCount, ByteFormatter.Format(SelectedBytes));
 
+    // ---- Pro: Ähnliche Bilder (Fuzzy) --------------------------------------
+
+    /// <summary>Aktiver Suchmodus (exakt oder ähnlich).</summary>
+    public DuplicateScanMode ScanMode
+    {
+        get => _scanMode;
+        set
+        {
+            if (SetProperty(ref _scanMode, value))
+            {
+                OnPropertyChanged(nameof(IsExactMode));
+                OnPropertyChanged(nameof(IsSimilarMode));
+                ScanCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>True, wenn der exakte Modus aktiv ist (für die TwoWay-Modusauswahl in der View).</summary>
+    public bool IsExactMode
+    {
+        get => ScanMode == DuplicateScanMode.Exact;
+        set { if (value) ScanMode = DuplicateScanMode.Exact; }
+    }
+
+    /// <summary>True, wenn der Ähnlichkeits-Modus aktiv ist.</summary>
+    public bool IsSimilarMode
+    {
+        get => ScanMode == DuplicateScanMode.Similar;
+        set { if (value) ScanMode = DuplicateScanMode.Similar; }
+    }
+
+    /// <summary>Ob die Ähnlichkeitssuche mangels Lizenz gesperrt ist (Pro-Schloss).</summary>
+    public bool IsSimilarLocked =>
+        !PremiumService.Instance.HasFeature(PremiumContract.FeatureFuzzyDuplicates);
+
+    /// <summary>Umkehrung von <see cref="IsSimilarLocked"/> (für IsEnabled-Bindungen in der View).</summary>
+    public bool IsSimilarUnlocked => !IsSimilarLocked;
+
+    /// <summary>Ähnlichkeitsschwelle (50–100); wird in den Einstellungen persistiert.</summary>
+    public int SimilarityThreshold
+    {
+        get => _threshold;
+        set
+        {
+            if (SetProperty(ref _threshold, value))
+            {
+                SettingsService.Instance.Current.FuzzyDuplicates.SimilarityThreshold = value;
+                SettingsService.Instance.Save();
+            }
+        }
+    }
+
+    // ---- Pro: Sicheres Löschen ---------------------------------------------
+
+    /// <summary>Ob sicheres Löschen mangels Lizenz gesperrt ist (Pro-Schloss).</summary>
+    public bool IsSecureDeleteLocked =>
+        !PremiumService.Instance.HasFeature(PremiumContract.FeatureSecureDelete);
+
+    /// <summary>Ob der nächste Löschvorgang sicher (mehrfaches Überschreiben) erfolgen soll.</summary>
+    public bool UseSecureDelete
+    {
+        get => _useSecureDelete;
+        set => SetProperty(ref _useSecureDelete, value);
+    }
+
+    /// <summary>Anzahl der Überschreib-Durchläufe {1,3,7}; wird in den Einstellungen persistiert.</summary>
+    public int SecureDeletePasses
+    {
+        get => _passes;
+        set
+        {
+            if (SetProperty(ref _passes, SecureDeleteOptions.NormalizePasses(value)))
+            {
+                SettingsService.Instance.Current.SecureDelete.Passes = _passes;
+                SettingsService.Instance.Save();
+                OnPropertyChanged(nameof(IsPasses1));
+                OnPropertyChanged(nameof(IsPasses3));
+                OnPropertyChanged(nameof(IsPasses7));
+            }
+        }
+    }
+
+    // Durchlauf-Auswahl als drei einander ausschließende Schalter (ohne Extra-Konverter).
+    public bool IsPasses1 { get => SecureDeletePasses == 1; set { if (value) SecureDeletePasses = 1; } }
+    public bool IsPasses3 { get => SecureDeletePasses == 3; set { if (value) SecureDeletePasses = 3; } }
+    public bool IsPasses7 { get => SecureDeletePasses == 7; set { if (value) SecureDeletePasses = 7; } }
+
     // ---- Ordnerauswahl ------------------------------------------------------
 
     /// <summary>Fügt per Systemdialog einen oder mehrere Ordner hinzu (Mehrfachauswahl).</summary>
     private void AddFolders()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Multiselect = true,
-            Title = Loc.T("duplicates.action.addFolder")
-        };
-        if (dialog.ShowDialog(Application.Current?.MainWindow) != true) return;
+        var folders = _dialogs.PickFolders(Loc.T("duplicates.action.addFolder"));
 
-        foreach (var folder in dialog.FolderNames)
+        foreach (var folder in folders)
         {
             if (!Folders.Contains(folder, StringComparer.OrdinalIgnoreCase))
                 Folders.Add(folder);
@@ -133,13 +233,12 @@ public sealed class DuplicatesViewModel : ViewModelBase
 
     private async Task ScanAsync()
     {
-        IsBusy = true;
-        Groups.Clear();
-        SelectedGroup = null;
-        OnPropertyChanged(nameof(HasGroups));
-        RefreshSelection();
+        // Pro-Gate: Der Ähnlich-Modus ist lizenzpflichtig. Vor jeglicher Arbeit freischalten (Upsell).
+        // Bleibt es nach dem Upsell gesperrt, ohne frisch aktivierte Lizenz abbrechen.
+        if (ScanMode == DuplicateScanMode.Similar &&
+            PremiumGate.StillLockedAfterUpsell(_dialogs, () => IsSimilarLocked, "premium.duplicates.locked"))
+            return;
 
-        _cts = new CancellationTokenSource();
         var progress = new Progress<DuplicateScanProgress>(p =>
         {
             StatusText = p.Phase == "collect"
@@ -148,32 +247,87 @@ public sealed class DuplicatesViewModel : ViewModelBase
         });
 
         var folders = Folders.ToList();
-        try
-        {
-            var found = await Task.Run(() => _scanner.Scan(folders, progress, _cts.Token));
 
-            foreach (var group in found)
-                Groups.Add(new DuplicateGroupViewModel(group, RefreshSelection));
-
-            long wasted = found.Sum(g => g.WastedBytes);
-            StatusText = found.Count == 0
-                ? Loc.T("duplicates.status.none")
-                : Loc.T("duplicates.status.summary",
-                    found.Count, found.Sum(g => g.Files.Count), ByteFormatter.Format(wasted));
-            SelectedGroup = Groups.FirstOrDefault();
-        }
-        catch (OperationCanceledException)
+        await RunCancellableAsync(async ct =>
         {
-            StatusText = Loc.T("duplicates.status.cancelled");
-        }
-        finally
-        {
-            _cts.Dispose();
-            _cts = null;
-            IsBusy = false;
+            Groups.Clear();
+            SelectedGroup = null;
             OnPropertyChanged(nameof(HasGroups));
             RefreshSelection();
-        }
+
+            if (ScanMode == DuplicateScanMode.Similar)
+            {
+                // Ausführung ausschließlich im signierten Modul – die offene App delegiert nur.
+                if (PremiumService.Instance.Module is not IFuzzyDuplicateRunner runner)
+                {
+                    StatusText = Loc.T("premium.error.moduleLoad");
+                    return;
+                }
+
+                var options = new FuzzyScanOptions
+                {
+                    SimilarityThreshold = FuzzyScanOptions.NormalizeThreshold(SimilarityThreshold)
+                };
+                var found = await runner.ScanAsync(folders, options, progress, ct);
+
+                foreach (var group in found)
+                    Groups.Add(BuildFromFuzzy(group));
+
+                StatusText = found.Count == 0
+                    ? Loc.T("duplicates.status.none")
+                    : Loc.T("duplicates.status.similarSummary",
+                        found.Count, found.Sum(g => g.Files.Count));
+                SelectedGroup = Groups.FirstOrDefault();
+            }
+            else
+            {
+                var found = await Task.Run(() => _scanner.Scan(folders, progress, ct));
+
+                foreach (var group in found)
+                    Groups.Add(new DuplicateGroupViewModel(group, RefreshSelection));
+
+                long wasted = found.Sum(g => g.WastedBytes);
+                StatusText = found.Count == 0
+                    ? Loc.T("duplicates.status.none")
+                    : Loc.T("duplicates.status.summary",
+                        found.Count, found.Sum(g => g.Files.Count), ByteFormatter.Format(wasted));
+                SelectedGroup = Groups.FirstOrDefault();
+            }
+        }, onCancelled: () => StatusText = Loc.T("duplicates.status.cancelled"));
+
+        OnPropertyChanged(nameof(HasGroups));
+        RefreshSelection();
+    }
+
+    /// <summary>
+    /// Adapter: bildet eine Ähnlichkeits-Gruppe des Moduls auf die bestehende exakte
+    /// Präsentation (<see cref="DuplicateGroup"/>/<see cref="DuplicateFile"/>) ab, damit der
+    /// Vergleichs- und Löschcode unverändert bleibt. Die niedrigste Ähnlichkeit der Gruppe
+    /// wird zur Info in den Gruppen-Summary übernommen; als Gruppengröße dient die größte Kopie
+    /// (jene, die per Standard behalten wird).
+    /// </summary>
+    private DuplicateGroupViewModel BuildFromFuzzy(FuzzyDuplicateGroup fuzzy)
+    {
+        var files = fuzzy.Files
+            .Select(f => new DuplicateFile
+            {
+                Path = f.Path,
+                SizeBytes = f.SizeBytes,
+                Created = f.Created,
+                Modified = f.Modified
+            })
+            .ToList();
+
+        long largest = fuzzy.Files.Count > 0 ? fuzzy.Files.Max(f => f.SizeBytes) : 0;
+        int similarity = fuzzy.Files.Count > 0 ? fuzzy.Files.Min(f => f.SimilarityScore) : 0;
+
+        var group = new DuplicateGroup
+        {
+            Hash = "",               // kein Inhalts-Hash bei Ähnlichkeit
+            SizeBytes = largest,
+            Files = files
+        };
+        return new DuplicateGroupViewModel(group, RefreshSelection, similarity);
     }
 
     // ---- Auswahl ------------------------------------------------------------
@@ -232,8 +386,7 @@ public sealed class DuplicatesViewModel : ViewModelBase
         // es gibt also keinen Service, der die Sperre sonst durchsetzen würde.
         if (IntegrityState.IsBlocked)
         {
-            MessageBox.Show(Loc.T("integrity.blocked.action"), "OpenClean",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _dialogs.ShowWarning(Loc.T("integrity.blocked.action"));
             return;
         }
 
@@ -241,16 +394,28 @@ public sealed class DuplicatesViewModel : ViewModelBase
         long bytes = SelectedBytes;
         if (count == 0) return;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        // Pro-Gate für sicheres Löschen: Bei fehlender Lizenz Upsell; bleibt es gesperrt,
+        // fällt der Ablauf auf den normalen (kostenlosen) Löschpfad zurück – nie blockieren.
+        if (UseSecureDelete &&
+            PremiumGate.StillLockedAfterUpsell(_dialogs, () => IsSecureDeleteLocked, "premium.secureDelete.locked"))
+            UseSecureDelete = false;
+
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("duplicates.confirm.body", count, ByteFormatter.Format(bytes)),
             Loc.T("duplicates.confirm.title"),
             Loc.T("duplicates.action.delete"));
         if (!confirmed) return;
 
+        // Secure-Delete-Zweig: bewusst unwiederbringlich, kein Sicherheitsnetz/Backup.
+        if (UseSecureDelete)
+        {
+            await SecureDeleteSelectedAsync(count);
+            return;
+        }
+
         // Sicherheitsnetz vorbereiten (Wiederherstellungspunkt + Datei-Backup/Undo).
         // Läuft VOR dem IsBusy-Wechsel, damit ein Abbruch den Zustand unberührt lässt.
-        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(Application.Current?.MainWindow, "duplicates");
+        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(_dialogs, "duplicates");
         if (!prep.Proceed)
         {
             StatusText = Loc.T("safety.aborted");
@@ -262,65 +427,85 @@ public sealed class DuplicatesViewModel : ViewModelBase
 
         var session = prep.Session;
         var groups = Groups.ToList();
-        int deleted = 0, skipped = 0;
-        long freed = 0;
         try
         {
-        (deleted, freed, skipped) = await Task.Run(() =>
-        {
-            int deletedCount = 0, skippedCount = 0;
-            long freedBytes = 0;
-            foreach (var group in groups)
-            {
-                // Sicherheits-Guard: pro Gruppe bleibt immer mindestens eine Kopie
-                // erhalten – auch wenn manuell alle markiert wurden.
-                var selected = group.Files.Where(f => f.IsSelected).ToList();
-                if (selected.Count == group.Files.Count)
-                {
-                    var spared = selected.OrderByDescending(f => f.Modified).First();
-                    selected.Remove(spared);
-                    skippedCount++;
-                }
+            var (deleted, freed, skipped) = await Task.Run(() => DeleteGroups(groups, session));
 
-                foreach (var file in selected)
+            PruneEmptiedGroups(groups);
+            StatusText = Loc.T("duplicates.status.deleted", deleted, ByteFormatter.Format(freed)) +
+                         (skipped > 0 ? Loc.T("duplicates.status.skipped", skipped) : "");
+        }
+        finally
+        {
+            // Manifest IMMER schreiben (auch bei unerwartetem Fehler) – sonst wären bereits gelöschte
+            // Dateien ohne Undo und der Ordner würde nie aufgeräumt. Commit ist idempotent.
+            prep.Session?.Commit();
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Löscht die markierten Kopien aller Gruppen (Hintergrund-Arbeit). Pro Gruppe bleibt über
+    /// <see cref="DuplicateDeletionGuard"/> immer mindestens eine Kopie erhalten. Löscht über die
+    /// Backup-Sitzung (Undo bevorzugt) oder – ohne Sicherheitsnetz – direkt. Gibt gelöschte Anzahl,
+    /// freigegebene Bytes und übersprungene Kopien zurück.
+    /// </summary>
+    private static (int deleted, long freed, int skipped) DeleteGroups(
+        IReadOnlyList<DuplicateGroupViewModel> groups, BackupSession? session)
+    {
+        int deletedCount = 0, skippedCount = 0;
+        long freedBytes = 0;
+
+        foreach (var group in groups)
+        {
+            var toDelete = DuplicateDeletionGuard.SelectDeletable(
+                group.Files, f => f.IsSelected, f => f.Modified, out bool sparedOne);
+            if (sparedOne) skippedCount++;
+
+            foreach (var file in toDelete)
+            {
+                try
                 {
-                    try
+                    if (session != null)
                     {
-                        if (session != null)
+                        // Über das Sicherheitsnetz löschen: Nutzerdaten bevorzugt sichern (Undo).
+                        var outcome = session.TryDelete(file.FilePath, false, file.SizeBytes, SafeDeleteStrategy.PreferBackup);
+                        if (outcome == SafeDeleteOutcome.Deleted)
                         {
-                            // Über das Sicherheitsnetz löschen: Nutzerdaten bevorzugt sichern (Undo).
-                            var outcome = session.TryDelete(file.FilePath, false, file.SizeBytes, SafeDeleteStrategy.PreferBackup);
-                            if (outcome == SafeDeleteOutcome.Deleted)
-                            {
-                                deletedCount++;
-                                freedBytes += file.SizeBytes;
-                                file.MarkDeleted();
-                            }
-                            else
-                            {
-                                skippedCount++;
-                            }
-                        }
-                        else
-                        {
-                            // Fallback ohne Backup (Sicherheitsnetz abgeschaltet): direkt löschen.
-                            File.Delete(file.FilePath);
                             deletedCount++;
                             freedBytes += file.SizeBytes;
                             file.MarkDeleted();
                         }
+                        else
+                        {
+                            skippedCount++;
+                        }
                     }
-                    catch
+                    else
                     {
-                        skippedCount++; // gesperrt/kein Zugriff -> überspringen
+                        // Fallback ohne Backup (Sicherheitsnetz abgeschaltet): direkt löschen.
+                        File.Delete(file.FilePath);
+                        deletedCount++;
+                        freedBytes += file.SizeBytes;
+                        file.MarkDeleted();
                     }
                 }
+                catch
+                {
+                    skippedCount++; // gesperrt/kein Zugriff -> überspringen
+                }
             }
-            return (deletedCount, freedBytes, skippedCount);
-        });
+        }
 
-        // Gelöschte Dateien aus den Gruppen entfernen; Gruppen mit nur noch einer
-        // verbliebenen Kopie sind keine Duplikate mehr.
+        return (deletedCount, freedBytes, skippedCount);
+    }
+
+    /// <summary>
+    /// Entfernt gelöschte Dateien aus den Gruppen; Gruppen mit nur noch einer verbliebenen Kopie
+    /// sind keine Duplikate mehr und verschwinden. Aktualisiert danach Auswahl und Zähler.
+    /// </summary>
+    private void PruneEmptiedGroups(IReadOnlyList<DuplicateGroupViewModel> groups)
+    {
         foreach (var group in groups)
         {
             group.RemoveDeleted();
@@ -334,16 +519,69 @@ public sealed class DuplicatesViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HasGroups));
         RefreshSelection();
-        StatusText = Loc.T("duplicates.status.deleted", deleted, ByteFormatter.Format(freed)) +
-                     (skipped > 0 ? Loc.T("duplicates.status.skipped", skipped) : "");
-        }
-        finally
+    }
+
+    /// <summary>
+    /// Pro-Pfad „Sicheres Löschen": überschreibt die markierten Kopien mehrfach und entfernt sie
+    /// unwiderruflich. Kein Sicherheitsnetz (Undo/Backup) – deshalb ein harter Extra-Warndialog.
+    /// Das Überschreiben selbst läuft ausschließlich im signierten Modul.
+    /// </summary>
+    private async Task SecureDeleteSelectedAsync(int count)
+    {
+        // Harter Extra-Warndialog ZUSÄTZLICH zur normalen Bestätigung.
+        bool sure = _dialogs.ConfirmThemed(
+            Loc.T("duplicates.secureDelete.warnBody", count),
+            Loc.T("duplicates.secureDelete.warnTitle"),
+            Loc.T("duplicates.secureDelete.confirm"));
+        if (!sure) return;
+
+        // Ausführung ausschließlich im signierten Modul – die offene App delegiert nur.
+        if (PremiumService.Instance.Module is not ISecureDeleteRunner sdRunner)
         {
-            // Manifest IMMER schreiben (auch bei unerwartetem Fehler) – sonst wären bereits gelöschte
-            // Dateien ohne Undo und der Ordner würde nie aufgeräumt. Commit ist idempotent.
-            prep.Session?.Commit();
-            IsBusy = false;
+            StatusText = Loc.T("premium.error.moduleLoad");
+            return;
         }
+
+        // Zu löschende Kopien sammeln: „mind. eine Kopie behalten"-Guard je Gruppe,
+        // danach defensiv über PathSafety filtern (nicht löschbare überspringen).
+        var groups = Groups.ToList();
+        var targets = new List<DuplicateFileViewModel>();
+        foreach (var group in groups)
+        {
+            var toDelete = DuplicateDeletionGuard.SelectDeletable(
+                group.Files, f => f.IsSelected, f => f.Modified, out _);
+            foreach (var file in toDelete)
+                if (PathSafety.IsDeletable(file.FilePath))
+                    targets.Add(file);
+        }
+
+        var paths = targets.Select(f => f.FilePath).ToList();
+
+        await RunCancellableAsync(async ct =>
+        {
+            StatusText = Loc.T("duplicates.status.deleting");
+
+            var progress = new Progress<SecureDeleteProgress>(p =>
+                StatusText = Loc.T("duplicates.secureDelete.status",
+                    p.FileIndex, p.FileCount, p.CurrentPass, p.PassCount));
+
+            var result = await sdRunner.SecureDeleteAsync(
+                paths, new SecureDeleteOptions { Passes = SecureDeletePasses }, progress, ct);
+
+            // Erfolgreich gelöschte Kopien aus den Gruppen entfernen (FailedPaths ausnehmen).
+            var failedSet = new HashSet<string>(result.FailedPaths, StringComparer.OrdinalIgnoreCase);
+            long freed = 0;
+            foreach (var file in targets)
+            {
+                if (failedSet.Contains(file.FilePath)) continue;
+                file.MarkDeleted();
+                freed += file.SizeBytes;
+            }
+
+            PruneEmptiedGroups(groups);
+            StatusText = Loc.T("duplicates.status.deleted", result.DeletedCount, ByteFormatter.Format(freed)) +
+                         (result.FailedCount > 0 ? Loc.T("duplicates.status.skipped", result.FailedCount) : "");
+        }, onCancelled: () => StatusText = Loc.T("duplicates.status.cancelled"));
     }
 
     // ---- Lokalisierung ------------------------------------------------------
@@ -365,12 +603,16 @@ public sealed class DuplicatesViewModel : ViewModelBase
 /// <summary>Eine Duplikat-Gruppe in der Liste (links) inkl. Auswahlzustand ihrer Dateien.</summary>
 public sealed class DuplicateGroupViewModel : ViewModelBase
 {
+    /// <summary>Ähnlichkeit der lockersten Kopie (0–100) im Ähnlich-Modus; null im exakten Modus.</summary>
+    private readonly int? _similarityScore;
+
     public DuplicateGroup Model { get; }
     public ObservableCollection<DuplicateFileViewModel> Files { get; } = new();
 
-    public DuplicateGroupViewModel(DuplicateGroup model, Action onSelectionChanged)
+    public DuplicateGroupViewModel(DuplicateGroup model, Action onSelectionChanged, int? similarityScore = null)
     {
         Model = model;
+        _similarityScore = similarityScore;
         foreach (var file in model.Files)
             Files.Add(new DuplicateFileViewModel(file, onSelectionChanged));
     }
@@ -380,8 +622,11 @@ public sealed class DuplicateGroupViewModel : ViewModelBase
 
     public string SizeDisplay => ByteFormatter.Format(Model.SizeBytes);
 
-    public string Summary => Loc.T("duplicates.group.summary",
-        Files.Count, ByteFormatter.Format(Model.SizeBytes));
+    public string Summary => _similarityScore is int score
+        ? Loc.T("duplicates.group.summarySimilar",
+            Files.Count, ByteFormatter.Format(Model.SizeBytes), score)
+        : Loc.T("duplicates.group.summary",
+            Files.Count, ByteFormatter.Format(Model.SizeBytes));
 
     public int SelectedCount => Files.Count(f => f.IsSelected);
 
@@ -456,11 +701,21 @@ public sealed class DuplicateFileViewModel : ViewModelBase
     public bool IsDeleted { get; private set; }
     public void MarkDeleted() => IsDeleted = true;
 
-    /// <summary>Bild-Vorschau (verkleinert) für die Vergleichsansicht; null bei Nicht-Bildern.</summary>
+    private BitmapImage? _previewSource;
+    private bool _previewLoaded;
+
+    /// <summary>
+    /// Bild-Vorschau (verkleinert) für die Vergleichsansicht; null bei Nicht-Bildern. Das Ergebnis
+    /// wird gecacht (eingefrorene <see cref="BitmapImage"/>), damit WPF bei jedem erneuten
+    /// Getter-Zugriff (Re-Measure, Container-Recycling) nicht die Datei neu von der Platte dekodiert.
+    /// </summary>
     public BitmapImage? PreviewSource
     {
         get
         {
+            if (_previewLoaded) return _previewSource;
+            _previewLoaded = true;
+
             if (!ImageExtensions.Contains(Path.GetExtension(_model.Path))) return null;
             try
             {
@@ -471,9 +726,11 @@ public sealed class DuplicateFileViewModel : ViewModelBase
                 image.CacheOption = BitmapCacheOption.OnLoad;
                 image.EndInit();
                 image.Freeze();
-                return image;
+                _previewSource = image;
             }
-            catch { return null; }
+            catch { _previewSource = null; }
+
+            return _previewSource;
         }
     }
 

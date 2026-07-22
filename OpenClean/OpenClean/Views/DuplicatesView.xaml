@@ -62,9 +62,49 @@
             </StackPanel>
         </Grid>
 
-        <!-- ===== Ordnerauswahl (Chips) ===== -->
+        <!-- ===== Ordnerauswahl (Chips) + Modus + Ähnlichkeitsschwelle ===== -->
         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,18,0,0" Padding="18,14">
             <StackPanel>
+                <!-- Modus-Umschaltung: exakt (kostenlos) vs. ähnlich (Pro) -->
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" CornerRadius="8" Padding="12,10" Background="{DynamicResource BgDeepBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <RadioButton GroupName="ScanMode" VerticalContentAlignment="Center"
+                                     IsChecked="{Binding IsExactMode, Mode=TwoWay}">
+                            <StackPanel Margin="6,0,0,0">
+                                <TextBlock Text="{loc:Loc duplicates.mode.exact}" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="{loc:Loc duplicates.mode.exactHint}" Style="{StaticResource MutedText}"
+                                           FontSize="11.5" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                    <Border Grid.Column="2" CornerRadius="8" Padding="12,10" Background="{DynamicResource BgDeepBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <RadioButton GroupName="ScanMode" VerticalContentAlignment="Center"
+                                     IsChecked="{Binding IsSimilarMode, Mode=TwoWay}">
+                            <StackPanel Margin="6,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{loc:Loc duplicates.mode.similar}" FontSize="13" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                    <Border Margin="8,0,0,0" Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
+                                            Background="{DynamicResource AccentSoftBrush}"
+                                            Visibility="{Binding IsSimilarLocked, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="PRO" FontSize="9.5" FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentBrush}" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="{loc:Loc duplicates.mode.similarHint}" Style="{StaticResource MutedText}"
+                                           FontSize="11.5" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                </Grid>
+
                 <TextBlock Text="{loc:Loc duplicates.folders.heading}" Style="{StaticResource MutedText}"
                            FontSize="11.5" FontWeight="SemiBold" />
                 <TextBlock Text="{loc:Loc duplicates.folders.empty}" Style="{StaticResource MutedText}"
@@ -97,6 +137,32 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- Ähnlichkeitsschwelle (nur im Ähnlich-Modus; deaktiviert wenn gesperrt) -->
+                <StackPanel Margin="0,14,0,0"
+                            Visibility="{Binding IsSimilarMode, Converter={StaticResource BoolToVis}}"
+                            IsEnabled="{Binding IsSimilarUnlocked}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{loc:Loc duplicates.similar.threshold}"
+                                   Style="{StaticResource MutedText}" FontSize="12.5" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <Slider Grid.Column="1" Minimum="50" Maximum="100" VerticalAlignment="Center"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Value="{Binding SimilarityThreshold, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   FontSize="12.5" FontWeight="SemiBold" MinWidth="42" TextAlignment="Right"
+                                   Foreground="{DynamicResource AccentBrush}">
+                            <Run Text="{Binding SimilarityThreshold, Mode=OneWay}" /><Run Text=" %" />
+                        </TextBlock>
+                    </Grid>
+                    <TextBlock Text="{loc:Loc duplicates.similar.thresholdHint}" Style="{StaticResource MutedText}"
+                               FontSize="11.5" Margin="0,6,0,0" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
@@ -122,15 +188,52 @@
                         Padding="12,6" FontSize="12" Margin="8,0,0,0"
                         Command="{Binding ClearSelectionCommand}" />
             </StackPanel>
-            <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
-                    Padding="16,8" Command="{Binding DeleteSelectedCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <Path Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
-                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                          Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z" />
-                    <TextBlock Text="{loc:Loc duplicates.action.delete}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Sicheres Löschen (Pro): mehrfaches Überschreiben, unwiderruflich -->
+                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <CheckBox VerticalAlignment="Center"
+                                  IsChecked="{Binding UseSecureDelete, Mode=TwoWay}"
+                                  Content="{loc:Loc duplicates.secureDelete.option}" />
+                        <Border Margin="8,0,0,0" Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
+                                Background="{DynamicResource AccentSoftBrush}"
+                                Visibility="{Binding IsSecureDeleteLocked, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="PRO" FontSize="9.5" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+                        <!-- Durchlauf-Auswahl (nur bei aktivem Secure Delete) -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
+                                    Visibility="{Binding UseSecureDelete, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{loc:Loc duplicates.secureDelete.passes}" Style="{StaticResource MutedText}"
+                                       FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <RadioButton GroupName="SecurePasses" Content="1×" Margin="0,0,8,0" VerticalAlignment="Center"
+                                         IsChecked="{Binding IsPasses1, Mode=TwoWay}" />
+                            <RadioButton GroupName="SecurePasses" Content="3×" Margin="0,0,8,0" VerticalAlignment="Center"
+                                         IsChecked="{Binding IsPasses3, Mode=TwoWay}" />
+                            <RadioButton GroupName="SecurePasses" Content="7×" VerticalAlignment="Center"
+                                         IsChecked="{Binding IsPasses7, Mode=TwoWay}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <!-- Roter Warnhinweis, sichtbar bei aktivem sicheren Löschen -->
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0"
+                                Visibility="{Binding UseSecureDelete, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="⚠" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
+                                   Foreground="{DynamicResource DangerBrush}" />
+                        <TextBlock Text="{loc:Loc duplicates.secureDelete.option}" FontSize="11.5"
+                                   TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource DangerBrush}" />
+                    </StackPanel>
                 </StackPanel>
-            </Button>
+                <Button Style="{StaticResource PrimaryButton}" VerticalAlignment="Center"
+                        Padding="16,8" Command="{Binding DeleteSelectedCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z" />
+                        <TextBlock Text="{loc:Loc duplicates.action.delete}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
 
         <!-- ===== Gruppen (links) + Vergleich nebeneinander (rechts) ===== -->
@@ -277,7 +380,7 @@
                                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc duplicates.file.size}"
                                                                Style="{StaticResource MutedText}" FontSize="11.5" Margin="0,0,12,3" />
                                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SizeDisplay}"
-                                                               FontSize="11.5" FontWeight="SemiBold" />
+                                                               Style="{StaticResource MetricText}" FontSize="11.5" FontWeight="SemiBold" />
                                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc duplicates.file.modified}"
                                                                Style="{StaticResource MutedText}" FontSize="11.5" Margin="0,0,12,3" />
                                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ModifiedDisplay}"

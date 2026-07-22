@@ -203,12 +203,12 @@ public sealed class BackupService
 
                 // Größenobergrenze: älteste der verbliebenen entfernen, bis unter dem Limit.
                 long total = 0;
-                foreach (var s in keep) total += DirectorySize(Path.Combine(StoreRoot, s.Id));
+                foreach (var s in keep) total += DirectorySizeCalculator.Sum(Path.Combine(StoreRoot, s.Id));
 
                 for (int i = keep.Count - 1; i >= 1 && total > RetentionMaxBytes; i--)
                 {
                     string sdir = Path.Combine(StoreRoot, keep[i].Id);
-                    total -= DirectorySize(sdir);
+                    total -= DirectorySizeCalculator.Sum(sdir);
                     DeleteSession(keep[i].Id);
                 }
             }
@@ -347,18 +347,4 @@ public sealed class BackupService
         Directory.Delete(source, recursive: true);
     }
 
-    internal static long DirectorySize(string dir)
-    {
-        long total = 0;
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-            {
-                try { total += new FileInfo(file).Length; }
-                catch { /* gesperrt -> überspringen */ }
-            }
-        }
-        catch { /* Zugriff verweigert -> Teilsumme */ }
-        return total;
-    }
 }

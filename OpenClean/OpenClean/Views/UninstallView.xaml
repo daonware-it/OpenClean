@@ -222,7 +222,7 @@
                                     <TextBlock Grid.Column="2" Text="{Binding Path}" VerticalAlignment="Center"
                                                FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
                                                TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding SizeDisplay}" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="3" Text="{Binding SizeDisplay}" Style="{StaticResource MetricText}" VerticalAlignment="Center"
                                                FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
                                                Margin="12,0,4,0" MinWidth="64" TextAlignment="Right" />
                                 </Grid>
@@ -257,9 +257,29 @@
 
         <!-- ===== Liste ===== -->
         <Border Grid.Row="3" Style="{StaticResource Card}" CornerRadius="0,0,10,10" BorderThickness="1,0,1,1">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,4">
-                <ItemsControl ItemsSource="{Binding AppsView}">
-                    <ItemsControl.ItemTemplate>
+            <ListBox ItemsSource="{Binding AppsView}"
+                     Background="Transparent" BorderThickness="0" Padding="6,4"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <!-- Container reicht nur durch: kein Auswahl-/Fokus-Highlight;
+                             Hover und Abstände liefert die Zeile im DataTemplate selbst. -->
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter HorizontalAlignment="Stretch" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border x:Name="row" Background="Transparent" CornerRadius="8" Padding="12,11" Margin="0,1">
                                 <Grid>
@@ -354,9 +374,8 @@
                                 </Trigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </ListBox.ItemTemplate>
+                </ListBox>
         </Border>
 
         <!-- ===== Statusleiste ===== -->

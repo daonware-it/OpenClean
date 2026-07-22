@@ -1,14 +1,12 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Windows;
 using System.Windows.Data;
-using System.Windows.Interop;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -25,6 +23,7 @@ public sealed class LargeFilesViewModel : ViewModelBase
 {
     private readonly DiskScannerService _scanner = new();
     private readonly SystemInfoService _systemInfo = new();
+    private readonly IDialogService _dialogs;
 
     /// <summary>Deckelung der Trefferliste – bewusst als Konstante statt Magic Number in
     /// <see cref="DiskScanOptions.MaxFiles"/>, damit <see cref="ScanAsync"/> erkennen kann,
@@ -65,8 +64,10 @@ public sealed class LargeFilesViewModel : ViewModelBase
     public RelayCommand OpenInExplorerCommand { get; }
     public RelayCommand SortCommand { get; }
 
-    public LargeFilesViewModel()
+    public LargeFilesViewModel(IDialogService? dialogs = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+
         foreach (var drive in _systemInfo.GetFixedDrives())
             Drives.Add(drive);
         _selectedDrive = Drives.FirstOrDefault();
@@ -242,22 +243,7 @@ public sealed class LargeFilesViewModel : ViewModelBase
         var selected = Files.Where(f => f.IsSelected).ToList();
         if (selected.Count == 0) return;
 
-        long expectedBytes = selected.Sum(f => f.SizeBytes);
-
-        // Ehrlich ansagen, was NICHT im Papierkorb landet: Bei aktivem „Dateien sofort löschen“,
-        // auf Laufwerken ohne Papierkorb oder oberhalb der Quote löscht Windows endgültig. Das
-        // gehört VOR die Entscheidung – nicht als Windows-Rückfrage mitten in den Lauf.
-        var permanent = selected.Where(f => !RecycleBin.WillGoToRecycleBin(f.FullPath, f.SizeBytes)).ToList();
-
-        string message = Loc.T("largefiles.confirm", selected.Count, ByteFormatter.Format(expectedBytes));
-        if (permanent.Count > 0)
-        {
-            message += Loc.T("largefiles.confirm.permanent",
-                permanent.Count, ByteFormatter.Format(permanent.Sum(f => f.SizeBytes)));
-        }
-
-        bool confirmed = ConfirmDialog.Show(Application.Current?.MainWindow, message);
-        if (!confirmed) return;
+        if (!_dialogs.ConfirmThemed(BuildDeleteConfirmMessage(selected))) return;
 
         // Löschen selbst ist bewusst nicht abbrechbar (läuft schon in Windows) – CancelCommand
         // darf trotz IsBusy nicht aktiv wirken, siehe dessen CanExecute im Konstruktor
@@ -274,102 +260,133 @@ public sealed class LargeFilesViewModel : ViewModelBase
             foreach (var file in blocked)
                 file.MarkProtected();
 
-            // Fensterhandle MUSS auf dem UI-Thread beschafft werden (vor dem Task.Run) – ein
-            // eventueller "zu groß für den Papierkorb"-Dialog soll modal zum Hauptfenster
-            // erscheinen. Der eigentliche Aufruf läuft im Hintergrund, weil er ohne Zeitlimit auf
-            // eine mögliche Nutzerbestätigung warten kann und den UI-Thread sonst einfrieren würde.
-            IntPtr ownerHandle = Application.Current?.MainWindow is { } mainWindow
-                ? new WindowInteropHelper(mainWindow).Handle
-                : IntPtr.Zero;
-
-            // Über eine Backup-Sitzung löschen, damit der Lauf im Wiederherstellen-Bereich auftaucht
-            // und sich rückgängig machen lässt – bisher ging dieser Bereich als einziger direkt an
-            // die Shell, weshalb im Papierkorb liegende Dateien in der App als „weg“ galten.
-            //
-            // Kein Wiederherstellungspunkt (anders als SafetyPrompt.PrepareAsync): Die
-            // Systemwiederherstellung sichert keine Nutzerdaten, für eine gelöschte Videodatei wäre
-            // sie also wirkungslos – nur ein minutenlanger Umweg vor dem Löschen.
-            //
-            // RecycleOnly: NIEMALS eine Backup-Kopie anlegen. Eine mehrere GB große Datei erst zu
-            // kopieren würde den Platzbedarf verdoppeln und den Zweck des Bereichs zerstören.
-            BackupSession? session = SettingsService.Instance.Current.Safety.BackupBeforeDelete
-                ? BackupService.Instance.BeginSession("largefiles", ownerHandle)
-                : null;
-
             var requests = deletable
                 .Select(f => new SafeDeleteRequest(f.FullPath, false, f.SizeBytes))
                 .ToList();
 
-            IReadOnlyList<SafeDeleteOutcome> outcomes = await Task.Run(() =>
-            {
-                if (session is not null)
-                    return session.TryDeleteMany(requests, SafeDeleteStrategy.RecycleOnly);
+            IReadOnlyList<SafeDeleteOutcome> outcomes = await RunDeleteAsync(requests);
 
-                // Sicherheitsnetz abgeschaltet -> direkt in den Papierkorb wie bisher.
-                var failedPaths = RecycleBin.MoveToRecycleBin(
-                    requests.Select(r => r.Path).ToList(), ownerHandle);
-                var failedSet = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
-                return requests
-                    .Select(r => failedSet.Contains(r.Path)
-                        ? SafeDeleteOutcome.Skipped
-                        : SafeDeleteOutcome.Deleted)
-                    .ToList();
-            });
-
-            session?.Commit();
-
-            long freedBytes = 0;
-            int deletedCount = 0;
-            int failedCount = 0;
-
-            for (int i = 0; i < deletable.Count; i++)
-            {
-                var file = deletable[i];
-                if (outcomes[i] != SafeDeleteOutcome.Deleted)
-                {
-                    file.MarkFailed();
-                    failedCount++;
-                    continue;
-                }
-
-                freedBytes += file.SizeBytes;
-                deletedCount++;
-                Files.Remove(file);
-            }
-
-            // Geschützte Dateien werden nie zum Löschen versucht – sie zählen deshalb nicht als
-            // "fehlgeschlagen" (das widerspräche der Liste, die sie schon als "Geschützter
-            // Systempfad" ausweist), sondern werden getrennt ausgewiesen.
-            int blockedCount = blocked.Count;
-
-            StatusText = (failedCount, blockedCount) switch
-            {
-                (0, 0) => Loc.T("largefiles.deleted", deletedCount, ByteFormatter.Format(freedBytes)),
-                (> 0, 0) => Loc.T("largefiles.deletePartial", deletedCount, failedCount),
-                (0, > 0) => Loc.T("largefiles.deletePartialProtected", deletedCount, blockedCount),
-                _ => Loc.T("largefiles.deletePartialBoth", deletedCount, failedCount, blockedCount)
-            };
+            ApplyDeleteOutcomes(deletable, outcomes, blocked.Count);
         }
         catch (Exception ex)
         {
             // Ohne diese Meldung sähe der Nutzer bei einer unerwarteten Ausnahme gar keine
             // Rückmeldung – markierte Dateien blieben liegen und niemand wüsste, warum. Die
-            // Ausnahme wird nicht weitergeworfen: AsyncRelayCommand würde zwar zusätzlich eine
-            // MessageBox zeigen, aber die Statuszeile soll unabhängig davon stimmen.
+            // Ausnahme wird nicht weitergeworfen: AsyncRelayCommand würde zwar zusätzlich einen
+            // Fehlerdialog zeigen, aber die Statuszeile soll unabhängig davon stimmen.
             StatusText = Loc.T("largefiles.deleteError", ex.Message);
         }
         finally
         {
             // Auch im Fehlerfall muss der Listenzustand aktualisiert werden: Wurden vor der
             // Ausnahme bereits Dateien aus "Files" entfernt, wären "HasResults"/"ShowEmptyHint"
-            // sonst veraltet. Im Erfolgsfall wurden beide Aufrufe oben entfernt, damit sie hier
-            // nicht doppelt laufen.
+            // sonst veraltet.
             RaiseListState();
             RefreshSelectionState();
 
             _isDeleting = false;
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Baut den Bestätigungstext und benennt dabei ehrlich, was NICHT im Papierkorb landet: Bei
+    /// aktivem „Dateien sofort löschen“, auf Laufwerken ohne Papierkorb oder oberhalb der Quote
+    /// löscht Windows endgültig. Das gehört VOR die Entscheidung – nicht als Windows-Rückfrage
+    /// mitten in den Lauf.
+    /// </summary>
+    private static string BuildDeleteConfirmMessage(IReadOnlyList<LargeFileViewModel> selected)
+    {
+        long expectedBytes = selected.Sum(f => f.SizeBytes);
+        var permanent = selected.Where(f => !RecycleBin.WillGoToRecycleBin(f.FullPath, f.SizeBytes)).ToList();
+
+        string message = Loc.T("largefiles.confirm", selected.Count, ByteFormatter.Format(expectedBytes));
+        if (permanent.Count > 0)
+        {
+            message += Loc.T("largefiles.confirm.permanent",
+                permanent.Count, ByteFormatter.Format(permanent.Sum(f => f.SizeBytes)));
+        }
+
+        return message;
+    }
+
+    /// <summary>
+    /// Führt das eigentliche Löschen aus. Löscht – sofern das Sicherheitsnetz aktiv ist – über eine
+    /// Backup-Sitzung, damit der Lauf im Wiederherstellen-Bereich auftaucht und sich rückgängig
+    /// machen lässt; sonst direkt in den Papierkorb (wie bisher).
+    ///
+    /// <para>Kein Wiederherstellungspunkt (anders als <see cref="SafetyPrompt.PrepareAsync"/>): Die
+    /// Systemwiederherstellung sichert keine Nutzerdaten, für eine gelöschte Videodatei wäre sie
+    /// wirkungslos. RecycleOnly: NIEMALS eine Backup-Kopie anlegen – eine mehrere GB große Datei
+    /// erst zu kopieren würde den Platzbedarf verdoppeln und den Zweck des Bereichs zerstören.</para>
+    /// </summary>
+    private async Task<IReadOnlyList<SafeDeleteOutcome>> RunDeleteAsync(IReadOnlyList<SafeDeleteRequest> requests)
+    {
+        // Fensterhandle MUSS auf dem UI-Thread beschafft werden (vor dem Task.Run) – ein eventueller
+        // "zu groß für den Papierkorb"-Dialog soll modal zum Hauptfenster erscheinen. Der eigentliche
+        // Aufruf läuft im Hintergrund, weil er ohne Zeitlimit auf eine mögliche Nutzerbestätigung
+        // warten kann und den UI-Thread sonst einfrieren würde.
+        IntPtr ownerHandle = _dialogs.OwnerHandle;
+
+        BackupSession? session = SettingsService.Instance.Current.Safety.BackupBeforeDelete
+            ? BackupService.Instance.BeginSession("largefiles", ownerHandle)
+            : null;
+
+        IReadOnlyList<SafeDeleteOutcome> outcomes = await Task.Run(() =>
+        {
+            if (session is not null)
+                return session.TryDeleteMany(requests, SafeDeleteStrategy.RecycleOnly);
+
+            // Sicherheitsnetz abgeschaltet -> direkt in den Papierkorb wie bisher.
+            var failedPaths = RecycleBin.MoveToRecycleBin(
+                requests.Select(r => r.Path).ToList(), ownerHandle);
+            var failedSet = new HashSet<string>(failedPaths, StringComparer.OrdinalIgnoreCase);
+            return requests
+                .Select(r => failedSet.Contains(r.Path)
+                    ? SafeDeleteOutcome.Skipped
+                    : SafeDeleteOutcome.Deleted)
+                .ToList();
+        });
+
+        session?.Commit();
+        return outcomes;
+    }
+
+    /// <summary>
+    /// Wertet die Löschergebnisse aus: entfernt gelöschte Dateien aus der Liste, markiert
+    /// fehlgeschlagene und setzt die Statuszeile. Geschützte (blockierte) Dateien werden nie zum
+    /// Löschen versucht – sie zählen deshalb nicht als „fehlgeschlagen“, sondern werden getrennt
+    /// ausgewiesen.
+    /// </summary>
+    private void ApplyDeleteOutcomes(
+        IReadOnlyList<LargeFileViewModel> deletable, IReadOnlyList<SafeDeleteOutcome> outcomes, int blockedCount)
+    {
+        long freedBytes = 0;
+        int deletedCount = 0;
+        int failedCount = 0;
+
+        for (int i = 0; i < deletable.Count; i++)
+        {
+            var file = deletable[i];
+            if (outcomes[i] != SafeDeleteOutcome.Deleted)
+            {
+                file.MarkFailed();
+                failedCount++;
+                continue;
+            }
+
+            freedBytes += file.SizeBytes;
+            deletedCount++;
+            Files.Remove(file);
+        }
+
+        StatusText = (failedCount, blockedCount) switch
+        {
+            (0, 0) => Loc.T("largefiles.deleted", deletedCount, ByteFormatter.Format(freedBytes)),
+            (> 0, 0) => Loc.T("largefiles.deletePartial", deletedCount, failedCount),
+            (0, > 0) => Loc.T("largefiles.deletePartialProtected", deletedCount, blockedCount),
+            _ => Loc.T("largefiles.deletePartialBoth", deletedCount, failedCount, blockedCount)
+        };
     }
 
     private void SetAllSelection(bool selected)

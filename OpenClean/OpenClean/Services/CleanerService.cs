@@ -345,11 +345,9 @@ public sealed class CleanerService
 
         foreach (var extractBase in NetBundleExtractBases())
         {
-            if (full.Equals(extractBase, StringComparison.OrdinalIgnoreCase)) return true;
-            // Echtes Nachfahren-Verhältnis (Grenze am Trennzeichen, kein reiner StartsWith:
-            // sonst würde "...\.network" fälschlich auf "...\.net" matchen).
-            if (full.StartsWith(extractBase + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                return true;
+            // Gleich oder echter Nachfahre (Grenze am Trennzeichen, kein reiner StartsWith:
+            // sonst würde "...\.network" fälschlich auf "...\.net" matchen) – zentral in PathScope.
+            if (PathScope.IsSameOrUnderNormalized(full, extractBase)) return true;
         }
 
         return false;

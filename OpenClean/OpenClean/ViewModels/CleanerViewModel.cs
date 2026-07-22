@@ -1,11 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -13,15 +12,15 @@ namespace OpenClean.ViewModels;
 /// Agent 1 + 2: Steuert Scan → Vorschau → Bereinigen.
 /// Es wird nie etwas gelöscht, bevor der Nutzer nach einem Scan explizit bestätigt.
 /// </summary>
-public sealed class CleanerViewModel : ViewModelBase
+public sealed class CleanerViewModel : ScanViewModelBase
 {
     private readonly TempScannerService _scanner = new();
     private readonly CleanerService _cleaner = new();
+    private readonly IDialogService _dialogs;
 
     private bool _hasScanned;
     private bool _suppressSelectionCallback;
     private string _statusText = Loc.T("cleaner.status.ready");
-    private bool _isBusy;
     private bool _isLargeFilesTab;
 
     private double _scanProgressPercent;
@@ -47,8 +46,10 @@ public sealed class CleanerViewModel : ViewModelBase
     public RelayCommand ShowCategoriesCommand { get; private set; } = null!;
     public RelayCommand ShowLargeFilesCommand { get; private set; } = null!;
 
-    public CleanerViewModel()
+    public CleanerViewModel(IDialogService? dialogs = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+
         foreach (var category in _scanner.CreateCategories())
         {
             // Echtes Browser-Icon (Chrome/Edge/Brave/Firefox); null für andere Kategorien.
@@ -66,6 +67,18 @@ public sealed class CleanerViewModel : ViewModelBase
         DeselectAllCommand = new RelayCommand(_ => SetAllSelection(false), _ => CanChangeSelection);
         ShowCategoriesCommand = new RelayCommand(_ => IsLargeFilesTab = false);
         ShowLargeFilesCommand = new RelayCommand(_ => IsLargeFilesTab = true);
+
+        // Busy-abhängige Commands zentral neu bewerten lassen. Der Cleaner-Lauf ist nicht abbrechbar,
+        // daher wird das von der Basis bereitgestellte CancelCommand hier bewusst nicht gebunden.
+        RegisterBusyCommands(ScanCommand, CleanCommand, UndoLastCommand,
+            SelectAllCommand, DeselectAllCommand);
+    }
+
+    /// <summary>Neben den Commands hängen auch diese abgeleiteten Zustände am Busy-Flag.</summary>
+    protected override void OnBusyChanged()
+    {
+        OnPropertyChanged(nameof(CanChangeSelection));
+        OnPropertyChanged(nameof(CanUndoLast));
     }
 
     /// <summary>True, wenn der Große-Dateien-Tab aktiv ist.</summary>
@@ -108,23 +121,6 @@ public sealed class CleanerViewModel : ViewModelBase
         RefreshSelectionState();
     }
 
-    public bool IsBusy
-    {
-        get => _isBusy;
-        private set
-        {
-            if (SetProperty(ref _isBusy, value))
-            {
-                ScanCommand.RaiseCanExecuteChanged();
-                CleanCommand.RaiseCanExecuteChanged();
-                UndoLastCommand.RaiseCanExecuteChanged();
-                SelectAllCommand.RaiseCanExecuteChanged();
-                DeselectAllCommand.RaiseCanExecuteChanged();
-                OnPropertyChanged(nameof(CanChangeSelection));
-                OnPropertyChanged(nameof(CanUndoLast));
-            }
-        }
-    }
 
     public string StatusText
     {
@@ -268,8 +264,7 @@ public sealed class CleanerViewModel : ViewModelBase
         long expectedBytes = TotalSelectedBytes;
         int expectedCount = SelectedCount;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("cleaner.confirm.message", expectedCount, ByteFormatter.Format(expectedBytes)));
 
         if (!confirmed) return;
@@ -284,7 +279,7 @@ public sealed class CleanerViewModel : ViewModelBase
         // Sicherheitsnetze VOR dem Löschen: Wiederherstellungspunkt (mit Rückfrage bei Fehlschlag)
         // und Backup-Sitzung. Bricht der Nutzer am Gate ab, wird nichts gelöscht.
         SafetyPreparation prep = await SafetyPrompt.PrepareAsync(
-            Application.Current?.MainWindow, "cleanup", msg => ScanProgressText = msg);
+            _dialogs, "cleanup", msg => ScanProgressText = msg);
 
         if (!prep.Proceed)
         {

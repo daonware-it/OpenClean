@@ -145,7 +145,7 @@ public sealed class TempScannerService
             {
                 done++;
                 progress?.Report(new ScanProgress { CurrentPath = root.Path, Done = done, Total = total });
-                long selfSize = DirectorySize(root.Path);
+                long selfSize = DirectorySizeCalculator.Sum(root.Path);
                 if ((selfSize > 0 || IsEmptyReclaimable(root.Path))
                     && !CleanerService.IsProtectedFromCleaning(root.Path) && seen.Add(root.Path))
                     results.Add(new ScanItem { FullPath = root.Path, SizeBytes = selfSize, IsDirectory = true, SubKey = root.SubKey });
@@ -184,7 +184,7 @@ public sealed class TempScannerService
                 ScanItem? item;
                 if (Directory.Exists(entry))
                 {
-                    long size = DirectorySize(entry);
+                    long size = DirectorySizeCalculator.Sum(entry);
                     item = size > 0 || IsEmptyReclaimable(entry)
                         ? new ScanItem { FullPath = entry, SizeBytes = size, IsDirectory = true, SubKey = root.SubKey }
                         : null;
@@ -244,21 +244,6 @@ public sealed class TempScannerService
     {
         try { return !Directory.EnumerateFileSystemEntries(dir).Any(); }
         catch { return false; }
-    }
-
-    private static long DirectorySize(string dir)
-    {
-        long total = 0;
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-            {
-                try { total += new FileInfo(file).Length; }
-                catch { /* gesperrt/nicht lesbar -> überspringen */ }
-            }
-        }
-        catch { /* Zugriff verweigert -> Teilsumme */ }
-        return total;
     }
 
     // ---- Ziel-Definitionen --------------------------------------------------
@@ -433,25 +418,12 @@ public sealed class TempScannerService
         return areas.Where(a => !string.IsNullOrWhiteSpace(a));
     }
 
-    /// <summary>Normalisiert einen Pfad (voll qualifiziert, ohne Trailing-Separator).</summary>
-    private static string NormalizePath(string path)
-    {
-        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
-        catch { return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
-    }
-
     /// <summary>
     /// True, wenn <paramref name="path"/> gleich <paramref name="basePath"/> oder ein
-    /// Nachfahre davon ist. Nutzt Pfad-Grenzen (Separator), damit „…\Temp" nicht
-    /// fälschlich „…\TempX" matcht. Case-insensitiv.
+    /// Nachfahre davon ist. Grenz-Logik zentral in <see cref="PathScope"/>.
     /// </summary>
     private static bool IsWithinOrEqual(string path, string basePath)
-    {
-        string a = NormalizePath(path);
-        string b = NormalizePath(basePath);
-        if (a.Equals(b, StringComparison.OrdinalIgnoreCase)) return true;
-        return a.StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
+        => PathScope.IsSameOrUnder(path, basePath);
 
     /// <summary>True, wenn die Pfade gleich sind oder einer den anderen enthält (beide Richtungen).</summary>
     private static bool PathsRelated(string a, string b)

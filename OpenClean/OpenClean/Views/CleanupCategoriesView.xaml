@@ -33,21 +33,21 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
-                          Stroke="#FF10261F" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
+                          Stroke="{DynamicResource OnAccentBrush}" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
                           StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                     <TextBlock Text="{Binding LastReportText}" Margin="14,0,0,0" VerticalAlignment="Center"
-                               Foreground="#FF10261F" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                               Foreground="{DynamicResource OnAccentBrush}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
                 <!-- Rückgängig: stellt die gesicherten Dateien des letzten Durchlaufs wieder her. -->
                 <Button Grid.Column="1" Command="{Binding UndoLastCommand}"
                         Content="{loc:Loc safety.undo.action}"
                         Visibility="{Binding CanUndoLast, Converter={StaticResource BoolToVis}}"
                         VerticalAlignment="Center" Margin="16,0,0,0" Cursor="Hand"
-                        FontSize="13" FontWeight="SemiBold" Foreground="#FF10261F">
+                        FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentBrush}">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bd" CornerRadius="8" Padding="14,7"
-                                    Background="#33FFFFFF" BorderBrush="#FF10261F" BorderThickness="1.5">
+                                    Background="#33FFFFFF" BorderBrush="{DynamicResource OnAccentBrush}" BorderThickness="1.5">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <ControlTemplate.Triggers>
@@ -82,7 +82,7 @@
                     <StackPanel>
                         <TextBlock Text="{loc:Loc cleaner.objects}" Style="{StaticResource MutedText}" FontSize="11"
                                    HorizontalAlignment="Center" />
-                        <TextBlock Text="{Binding SelectedCount}" FontSize="24" FontWeight="Bold"
+                        <TextBlock Text="{Binding SelectedCount}" Style="{StaticResource MetricText}" FontSize="24" FontWeight="Bold"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
                 </Border>

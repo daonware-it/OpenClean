@@ -5,6 +5,8 @@ openclean-premium/
 ## IDE (JetBrains Rider) und lokale Test-Builds
 .idea/
 test-build/
+*[Cc]la*
+.super*/
 
 ## Store-Items
 store/

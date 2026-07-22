@@ -236,7 +236,7 @@ public sealed class DelayedStartupService
     /// </summary>
     private static string BuildTaskXml(StartupEntry entry, int delaySeconds)
     {
-        var (exe, arguments) = StartupService.SplitCommand(entry.Command);
+        var (exe, arguments) = CommandLine.Split(entry.Command);
         // Store-App/nicht auflösbar ist über CanDelay bereits ausgeschlossen; für Einträge aus
         // dem Autostart-Ordner steht in Command das aufgelöste Verknüpfungsziel.
         if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))

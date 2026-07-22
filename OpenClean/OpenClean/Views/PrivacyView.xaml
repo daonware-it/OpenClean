@@ -5,13 +5,44 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:OpenClean.Views"
              xmlns:loc="clr-namespace:OpenClean.Services.Localization"
+             xmlns:ctl="clr-namespace:OpenClean.Controls"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="900"
              Background="{DynamicResource BgBrush}"
              FontFamily="{DynamicResource AppFont}">
+    <UserControl.Resources>
+        <!-- Eingabefeld der Cookie-Whitelist -->
+        <Style x:Key="WhitelistInputStyle" TargetType="TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="bd" Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                CornerRadius="10" Padding="12,0">
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid Margin="32,10,32,0">
+        <!-- Kopfzeile und Statusleiste bleiben fest stehen; ALLES dazwischen liegt in genau
+             einem seitenweiten ScrollViewer (Zeile 1). Frueher war der obere Block eine
+             Auto-Zeile: er wuchs mit seinem Inhalt und quetschte die Kategorien-Zeile auf
+             wenige Pixel zusammen, sodass „Browser-Verlauf" unerreichbar war. -->
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -45,8 +76,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- ===== Result + Summary banners ===== -->
-        <StackPanel Grid.Row="1">
+        <!-- ===== Seiten-ScrollViewer: einziger Scroll-Container der Seite ===== -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
+        <StackPanel>
 
             <!-- Ergebnis-Banner nach dem Bereinigen -->
             <Border Margin="0,22,0,0" Padding="20,14" CornerRadius="10"
@@ -54,10 +87,10 @@
                     Visibility="{Binding HasReport, Converter={StaticResource BoolToVis}}">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
-                          Stroke="#FF10261F" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
+                          Stroke="{DynamicResource OnAccentBrush}" StrokeThickness="2.5" Data="M 0,6 L 5,11 L 14,0"
                           StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                     <TextBlock Text="{Binding LastReportText}" Margin="14,0,0,0" VerticalAlignment="Center"
-                               Foreground="#FF10261F" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                               Foreground="{DynamicResource OnAccentBrush}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
@@ -82,25 +115,198 @@
                         <StackPanel>
                             <TextBlock Text="{loc:Loc privacy.entries}" Style="{StaticResource MutedText}" FontSize="11"
                                        HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding SelectedCount}" FontSize="24" FontWeight="Bold"
+                            <TextBlock Text="{Binding SelectedCount}" Style="{StaticResource MetricText}" FontSize="24" FontWeight="Bold"
                                        HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </Grid>
             </Border>
 
-        </StackPanel>
+            <!-- Cookie-Whitelist: geschützte Domains verwalten -->
+            <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18">
+                <StackPanel>
+                    <TextBlock Text="{loc:Loc privacy.whitelist.title}" FontSize="14.5" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Loc privacy.whitelist.description}" Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" Margin="0,4,0,0" />
 
-        <!-- ===== Categories + preview ===== -->
-        <Grid Grid.Row="2" Margin="0,18,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+                    <!-- Eingabezeile -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <TextBox x:Name="WhitelistInput" Style="{StaticResource WhitelistInputStyle}"
+                                     Text="{Binding NewWhitelistDomain, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding AddWhitelistCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <TextBlock Text="{loc:Loc privacy.whitelist.placeholder}" IsHitTestVisible="False"
+                                       Margin="14,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=WhitelistInput}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <Button Grid.Column="1" Content="{loc:Loc privacy.whitelist.add}"
+                                Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
+                                Command="{Binding AddWhitelistCommand}" />
+                    </Grid>
 
+                    <!-- Leerzustand -->
+                    <TextBlock Text="{loc:Loc privacy.whitelist.empty}" Style="{StaticResource MutedText}"
+                               Margin="0,12,0,0"
+                               Visibility="{Binding WhitelistDomains.Count, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+
+                    <!-- Liste der geschützten Domains -->
+                    <ItemsControl ItemsSource="{Binding WhitelistDomains}" Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding}" FontSize="13"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding}" />
+                                    <Button Grid.Column="1" Content="{loc:Loc privacy.whitelist.remove}"
+                                            Style="{StaticResource SecondaryButton}" Padding="12,6" FontSize="12.5"
+                                            Command="{Binding DataContext.RemoveWhitelistCommand,
+                                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Vorhandene Cookies: Inventar mit „+" je Domain -->
+            <Border Style="{StaticResource Card}" Margin="0,22,0,0" Padding="22,18">
+                <StackPanel>
+                    <!-- Kopfzeile mit Titel/Beschreibung links und Lade-Button rechts -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{loc:Loc privacy.browserCookies.title}" FontSize="14.5" FontWeight="SemiBold" />
+                            <TextBlock Text="{loc:Loc privacy.browserCookies.description}" Style="{StaticResource MutedText}"
+                                       TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="{loc:Loc privacy.browserCookies.refresh}"
+                                Style="{StaticResource SecondaryButton}" Margin="10,0,0,0" VerticalAlignment="Top"
+                                Command="{Binding LoadCookiesCommand}" />
+                    </Grid>
+
+                    <!-- Suchleiste: filtert live nach Domain oder Cookie-Name -->
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <TextBox x:Name="CookieSearchInput" Style="{StaticResource WhitelistInputStyle}"
+                                     Text="{Binding CookieSearch, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                            <!-- Platzhalter, solange nichts eingegeben ist (wie bei der Whitelist) -->
+                            <TextBlock Text="{loc:Loc privacy.browserCookies.searchHint}" IsHitTestVisible="False"
+                                       Margin="14,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=CookieSearchInput}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <TextBlock Grid.Column="1" Text="{Binding CookieCountText}"
+                                   Style="{StaticResource MutedText}" VerticalAlignment="Center"
+                                   Margin="10,0,0,0" />
+                    </Grid>
+
+                    <!-- Hinweis, wenn eine Cookie-DB gesperrt war (laufender Browser) -->
+                    <TextBlock Text="{Binding CookieHint}" Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding HasCookieHint, Converter={StaticResource BoolToVis}}" />
+
+                    <!-- Leerzustand -->
+                    <TextBlock Text="{Binding CookieEmptyText}" Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding BrowserCookies.Count, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+
+                    <!-- Inventar-Liste -->
+                    <!-- BubbleWheel: am Listenende geht das Mausrad an die Seite weiter -->
+                    <ListBox ItemsSource="{Binding BrowserCookies}" MaxHeight="240" Margin="0,12,0,0"
+                             ctl:NestedScrollBehavior.BubbleWheel="True"
+                             Background="Transparent" BorderThickness="0"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             VirtualizingStackPanel.IsVirtualizing="True"
+                             VirtualizingStackPanel.VirtualizationMode="Recycling">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,1" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Domain}" FontSize="13" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Domain}" />
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedText}"
+                                                   FontSize="11" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                        <!-- Cookie-Namen (Klartext in der Browser-DB) -->
+                                        <TextBlock Text="{Binding NamesPreview}" Style="{StaticResource MutedText}"
+                                                   FontSize="10.5" Margin="0,1,0,0" Opacity="0.75"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding NamesPreview}"
+                                                   Visibility="{Binding HasNames, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                    <!-- Entweder „+"-Button (falls hinzufügbar) oder „Auf Whitelist"-Marker -->
+                                    <Button Grid.Column="1" Content="+" Style="{StaticResource SecondaryButton}"
+                                            Padding="12,6" VerticalAlignment="Center"
+                                            ToolTip="{loc:Loc privacy.browserCookies.add}"
+                                            IsEnabled="{Binding CanAdd}"
+                                            Visibility="{Binding CanAdd, Converter={StaticResource BoolToVis}}"
+                                            Command="{Binding DataContext.AddCookieToWhitelistCommand,
+                                                      RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc privacy.browserCookies.onWhitelist}"
+                                               Style="{StaticResource MutedText}" VerticalAlignment="Center"
+                                               Visibility="{Binding IsWhitelisted, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Kategorien ===== -->
             <!-- Auswahl-Werkzeuge über der Kategorie-Liste -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
-                        Margin="0,0,8,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                        Margin="0,18,8,10">
                 <Button Content="{loc:Loc common.selectAll}" Style="{StaticResource SecondaryButton}"
                         Padding="12,6" FontSize="12.5"
                         Command="{Binding SelectAllCommand}" />
@@ -109,7 +315,7 @@
                         Command="{Binding DeselectAllCommand}" />
             </StackPanel>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+            <!-- Kein eigener ScrollViewer mehr: die Kategorien scrollen mit der Seite. -->
                 <ItemsControl ItemsSource="{Binding Groups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -160,6 +366,7 @@
                                     <Border Background="{DynamicResource BgDeepBrush}" CornerRadius="8"
                                             Visibility="{Binding Items.Count, Converter={StaticResource BoolToVis}}">
                                         <ListBox ItemsSource="{Binding Items}" MaxHeight="320"
+                                                 ctl:NestedScrollBehavior.BubbleWheel="True"
                                                  Background="Transparent" BorderThickness="0" Padding="6"
                                                  HorizontalContentAlignment="Stretch"
                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -227,11 +434,12 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
-        </Grid>
+
+        </StackPanel>
+        </ScrollViewer>
 
         <!-- ===== Status bar ===== -->
-        <Border Grid.Row="3" Background="{DynamicResource BgDeepBrush}"
+        <Border Grid.Row="2" Background="{DynamicResource BgDeepBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
                 Margin="-32,14,-32,0" Padding="32,12">
             <StackPanel>

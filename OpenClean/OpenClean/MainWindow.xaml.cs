@@ -1,7 +1,10 @@
+using System;
 using System.Windows;
-using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using OpenClean.Services;
-using OpenClean.Services.Localization;
+using OpenClean.ViewModels;
 
 namespace OpenClean;
 
@@ -10,21 +13,28 @@ namespace OpenClean;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private Storyboard? _scanlineScroll;
+    private Storyboard? _caretBlink;
+
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new OpenClean.ViewModels.MainViewModel();
-
-        // Toggle-Zustand am aktiven Theme ausrichten (beim Start aus Windows ermittelt).
-        ThemeToggle.IsChecked = ThemeService.Current == AppTheme.Light;
-        UpdateThemeLabel();
-
-        // Theme-Label bei Sprachwechsel neu setzen (Text kommt aus der Sprachdatei).
-        Loc.LanguageChanged += (_, _) => UpdateThemeLabel();
+        DataContext = new MainViewModel();
 
         // Maximiert ragt ein Fenster ohne Standard-Chrome sonst über den Bildschirmrand hinaus.
         StateChanged += (_, _) =>
             RootGrid.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
+
+        // Fenster-Effekte an den ThemeService koppeln (Scanline, Mono-Kennzahlen).
+        ThemeService.Changed += ApplyWindowEffects;
+        Loaded += (_, _) => ApplyWindowEffects();
+
+        // Mica braucht das native Handle -> nach Fenstererzeugung registrieren.
+        SourceInitialized += (_, _) =>
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            ThemeService.SetMicaTargetHandle(hwnd);
+        };
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
@@ -36,16 +46,80 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
         => Close();
 
-    private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+    /// <summary>Öffnet den zentralen Einstellungsbereich (Zahnrad in der Titelleiste).</summary>
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        ThemeService.Toggle();
-        UpdateThemeLabel();
+        if (DataContext is MainViewModel vm)
+            vm.CurrentSection = AppSection.Einstellungen;
     }
 
-    private void UpdateThemeLabel()
+    /// <summary>Steuert die theme-abhängigen Fenster-Effekte: Cyberpunk-Scanline (sichtbar,
+    /// mit Scroll außer bei ReduceMotion), Dev-Terminal-Cursor (blinkend außer bei ReduceMotion)
+    /// und Monospace-Kennzahlen (Cyberpunk oder Dev).</summary>
+    private void ApplyWindowEffects()
     {
-        ThemeLabel.Text = ThemeService.Current == AppTheme.Light
-            ? Loc.T("theme.light")
-            : Loc.T("theme.dark");
+        bool cyberpunk = ThemeService.Current == AppTheme.Cyberpunk;
+        bool dev = ThemeService.Current == AppTheme.Dev;
+        bool reduce = ThemeService.ReduceMotion;
+
+        // Scanline: bei Cyberpunk immer sichtbar; Scroll nur ohne ReduceMotion.
+        ScanlineOverlay.Visibility = cyberpunk ? Visibility.Visible : Visibility.Collapsed;
+        if (cyberpunk && !reduce)
+        {
+            _scanlineScroll ??= BuildScanlineScroll();
+            _scanlineScroll.Begin(this, true);
+        }
+        else
+        {
+            _scanlineScroll?.Stop(this);
+        }
+
+        // Dev-Cursor: bei Dev sichtbar; Blinken nur ohne ReduceMotion.
+        DevCaret.Visibility = dev ? Visibility.Visible : Visibility.Collapsed;
+        if (dev && !reduce)
+        {
+            _caretBlink ??= BuildCaretBlink();
+            _caretBlink.Begin(this, true);
+        }
+        else
+        {
+            _caretBlink?.Stop(this);
+        }
+
+        // Monospace-Kennzahlen bei Cyberpunk ODER Dev.
+        bool mono = cyberpunk || dev;
+        if (Application.Current is { } app && app.Resources["MetricText"] is System.Windows.Style)
+        {
+            var key = mono ? "MonoFont" : "AppFont";
+            if (app.Resources[key] is FontFamily ff)
+                app.Resources["MetricFontFamily"] = ff;
+        }
+    }
+
+    private Storyboard BuildScanlineScroll()
+    {
+        var anim = new DoubleAnimation(0, 3, new Duration(TimeSpan.FromSeconds(0.7)))
+        {
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        Storyboard.SetTarget(anim, ScanlineShift);
+        Storyboard.SetTargetProperty(anim, new PropertyPath(TranslateTransform.YProperty));
+        var sb = new Storyboard();
+        sb.Children.Add(anim);
+        return sb;
+    }
+
+    private Storyboard BuildCaretBlink()
+    {
+        var anim = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromSeconds(0.6)))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        Storyboard.SetTarget(anim, DevCaret);
+        Storyboard.SetTargetProperty(anim, new PropertyPath(UIElement.OpacityProperty));
+        var sb = new Storyboard();
+        sb.Children.Add(anim);
+        return sb;
     }
 }

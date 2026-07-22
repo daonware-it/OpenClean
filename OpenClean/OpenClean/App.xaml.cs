@@ -60,9 +60,13 @@ public partial class App : Application
         // entfernt (statt still ins Leere zu feuern) und der Nutzer einmalig informiert.
         SunsetLegacySchedule();
 
-        // Beim Start das gespeicherte Theme (settings.json) anwenden, sonst das
-        // Windows-App-Modus-Theme (Hell/Dunkel) – bevor das Hauptfenster gerendert wird.
-        ThemeService.ApplyTheme(ThemeService.DetectStartupTheme());
+        // Beim Start: gespeicherte Palette + Modifier anwenden, bevor das Hauptfenster rendert.
+        var settings = SettingsService.Instance.Current;
+        ThemeService.ApplyAll(
+            ThemeService.DetectStartupTheme(),
+            settings.UseWindowsAccent,
+            settings.UseMicaBackdrop,
+            settings.ReduceMotion);
 
         // Hauptfenster explizit erzeugen (StartupUri wurde bewusst entfernt).
         var window = new MainWindow();

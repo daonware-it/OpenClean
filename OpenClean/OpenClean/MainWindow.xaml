@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         Title="OpenClean" Icon="Resources/openclean.png" Height="760" Width="1180"
         MinHeight="620" MinWidth="980"
-        Background="{DynamicResource BgBrush}"
+        Background="{DynamicResource WindowBackdropBrush}"
         WindowStartupLocation="CenterScreen"
         FontFamily="{StaticResource AppFont}">
     <!-- Eigene Titelleiste: Standard-Chrome ausblenden, Drag/Resize/Snap bleiben erhalten -->
@@ -31,8 +31,19 @@
         </Grid.ColumnDefinitions>
 
         <!-- ================= Titelleiste (Inhalt-Spalte) ================= -->
-        <Grid Grid.Row="0" Grid.Column="1" Background="{DynamicResource BgBrush}">
+        <Grid Grid.Row="0" Grid.Column="1" Background="{DynamicResource WindowBackdropBrush}">
+            <!-- Dev-Theme: blinkender Terminal-Cursor (Prompt-Charakter), nur bei Dev sichtbar. -->
+            <TextBlock x:Name="DevCaret" Text="_" FontFamily="{StaticResource MonoFont}"
+                       FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                       VerticalAlignment="Center" HorizontalAlignment="Left" Margin="16,0,0,0"
+                       IsHitTestVisible="False" Visibility="Collapsed" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <!-- Zahnrad: öffnet den zentralen Einstellungsbereich (Design, Sprache, Lizenz). -->
+                <Button Style="{StaticResource WindowControlButton}" Click="SettingsButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{loc:Loc titlebar.settings}">
+                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </Button>
                 <Button Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click"
                         WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{loc:Loc titlebar.minimize}">
                     <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"
@@ -83,71 +94,14 @@
 
                 <!-- Footer -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="24,0,20,18">
-                    <!-- Pro-Karte: immer sichtbarer Einstieg zur Lizenz-Seite.
-                         GroupName="Nav", damit die Nav-Auswahl konsistent bleibt. -->
-                    <RadioButton x:Name="NavLicense" GroupName="Nav" Cursor="Hand" Margin="0,0,0,16"
-                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
-                                             Converter={StaticResource EnumToBool}, ConverterParameter=Lizenz}">
-                        <RadioButton.Template>
-                            <ControlTemplate TargetType="RadioButton">
-                                <Border x:Name="bd" CornerRadius="12" Padding="14,12"
-                                        Background="{DynamicResource SurfaceBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                                    <ContentPresenter />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-                                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                    </Trigger>
-                                    <Trigger Property="IsChecked" Value="True">
-                                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </RadioButton.Template>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform"
-                                  VerticalAlignment="Center" Margin="0,0,10,0"
-                                  Fill="{DynamicResource AccentBrush}"
-                                  Data="M12 2 L15 9 L22 9.5 L17 14 L18.5 21 L12 17.5 L5.5 21 L7 14 L2 9.5 L9 9 Z" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{loc:Loc license.sidebar.title}" FontSize="12.5" FontWeight="SemiBold" />
-                                <TextBlock Text="{loc:Loc license.sidebar.active}"
-                                           Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0"
-                                           Visibility="{Binding IsPremium, Converter={StaticResource BoolToVis}}" />
-                                <TextBlock Text="{loc:Loc license.sidebar.inactive}"
-                                           Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0"
-                                           Visibility="{Binding IsPremium, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
-                            </StackPanel>
-                        </Grid>
-                    </RadioButton>
+                    <!-- Lizenz/Pro sowie Design- und Sprachauswahl sind in den zentralen
+                         Einstellungsbereich (Zahnrad in der Titelleiste) umgezogen. Eine feine
+                         Trennlinie setzt den Versionshinweis von der Navigationsliste ab. -->
                     <Border Height="1" Background="{DynamicResource BorderBrush}"
                             Opacity="0.6" Margin="0,0,0,14" />
-                    <StackPanel Orientation="Horizontal">
-                        <ToggleButton x:Name="ThemeToggle" Style="{StaticResource ToggleSwitch}"
-                                      VerticalAlignment="Center" Click="ThemeToggle_Click"
-                                      ToolTip="{loc:Loc theme.toggleTooltip}" />
-                        <TextBlock x:Name="ThemeLabel"
-                                   FontFamily="{StaticResource AppFont}" FontSize="13"
-                                   FontWeight="Medium"
-                                   Foreground="{DynamicResource TextBrush}"
-                                   VerticalAlignment="Center" Margin="12,0,0,0" />
-                    </StackPanel>
 
-                    <!-- Sprachauswahl -->
-                    <TextBlock Text="{loc:Loc sidebar.language}" Style="{StaticResource MutedText}"
-                               FontSize="10.5" FontWeight="SemiBold" Opacity="0.7" Margin="1,16,0,6" />
-                    <ComboBox Style="{StaticResource LanguageCombo}"
-                              ItemsSource="{Binding Languages, Source={x:Static loc:LocalizationManager.Instance}}"
-                              SelectedItem="{Binding CurrentLanguageOption, Source={x:Static loc:LocalizationManager.Instance}, Mode=TwoWay}" />
-
-                    <TextBlock Text="{loc:Loc sidebar.version}" Style="{StaticResource MutedText}"
-                               FontSize="11" Margin="1,14,0,0" />
+                    <TextBlock Text="{Binding SidebarVersion}" Style="{StaticResource MutedText}"
+                               FontSize="11" Margin="1,0,0,0" />
                 </StackPanel>
 
                 <!-- Nav: in ScrollViewer, damit bei kleiner Fensterhöhe (z.B. MinHeight) alle Einträge
@@ -177,16 +131,32 @@
                             <TextBlock Text="{loc:Loc nav.storage}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavCleaner" GroupName="Nav" Style="{StaticResource NavButton}"
-                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
-                                             Converter={StaticResource EnumToBool}, ConverterParameter=Bereinigung}">
+                    <!-- Zusammengefasste Reinigungs-Gruppe: der Gruppenkopf klappt die beiden
+                         Unterpunkte Bereinigung + Tiefenreinigung auf/zu. Die RadioButtons behalten
+                         ihre Namen (NavCleaner/NavDeepClean) und Section-Bindings – die Content-Views
+                         weiter unten hängen unverändert an deren IsChecked. -->
+                    <ToggleButton x:Name="NavCleaningGroup" Style="{StaticResource NavGroupToggle}"
+                                  IsChecked="{Binding IsCleaningExpanded, Mode=TwoWay}">
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                   Data="M6 2 L18 2 L18 6 L6 6 Z M8 6 L16 6 L15 21 L9 21 Z M11 9 L11 18 M14 9 L13 18" />
                             <TextBlock Text="{loc:Loc nav.cleaner}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
-                    </RadioButton>
+                    </ToggleButton>
+                    <StackPanel Visibility="{Binding IsChecked, ElementName=NavCleaningGroup,
+                                            Converter={StaticResource BoolToVis}}">
+                        <RadioButton x:Name="NavCleaner" GroupName="Nav" Style="{StaticResource NavSubButton}"
+                                     IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                                 Converter={StaticResource EnumToBool}, ConverterParameter=Bereinigung}">
+                            <TextBlock Text="{loc:Loc nav.cleaner}" VerticalAlignment="Center" />
+                        </RadioButton>
+                        <RadioButton x:Name="NavDeepClean" GroupName="Nav" Style="{StaticResource NavSubButton}"
+                                     IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                                 Converter={StaticResource EnumToBool}, ConverterParameter=Tiefenreinigung}">
+                            <TextBlock Text="{loc:Loc nav.deepclean}" VerticalAlignment="Center" />
+                        </RadioButton>
+                    </StackPanel>
                     <RadioButton x:Name="NavStartup" GroupName="Nav" Style="{StaticResource NavButton}"
                                  IsChecked="{Binding CurrentSection, Mode=TwoWay,
                                              Converter={StaticResource EnumToBool}, ConverterParameter=Autostart}">
@@ -215,6 +185,16 @@
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                                   Data="M12 2 L20 5 L20 11 C20 16 16 20 12 22 C8 20 4 16 4 11 L4 5 Z" />
                             <TextBlock Text="{loc:Loc nav.privacy}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavNetwork" GroupName="Nav" Style="{StaticResource NavButton}"
+                                 IsChecked="{Binding CurrentSection, Mode=TwoWay,
+                                             Converter={StaticResource EnumToBool}, ConverterParameter=Netzwerk}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                  Data="M12 2 C15 5 15 19 12 22 C9 19 9 5 12 2 Z M2 12 H22 M4.2 6.5 C6.5 8 17.5 8 19.8 6.5 M4.2 17.5 C6.5 16 17.5 16 19.8 17.5 M12 2 m -10 10 a 10 10 0 1 0 20 0 a 10 10 0 1 0 -20 0" />
+                            <TextBlock Text="{loc:Loc nav.network}" Margin="14,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavUpdates" GroupName="Nav" Style="{StaticResource NavButton}"
@@ -327,12 +307,16 @@
                               Visibility="{Binding IsChecked, ElementName=NavSystem, Converter={StaticResource BoolToVis}}" />
             <views:CleanerView DataContext="{Binding Cleaner}"
                                Visibility="{Binding IsChecked, ElementName=NavCleaner, Converter={StaticResource BoolToVis}}" />
+            <views:DeepCleanView DataContext="{Binding DeepClean}"
+                                 Visibility="{Binding IsChecked, ElementName=NavDeepClean, Converter={StaticResource BoolToVis}}" />
             <views:StartupView DataContext="{Binding Startup}"
                                Visibility="{Binding IsChecked, ElementName=NavStartup, Converter={StaticResource BoolToVis}}" />
             <views:ContextMenuView DataContext="{Binding ContextMenu}"
                                    Visibility="{Binding IsChecked, ElementName=NavContextMenu, Converter={StaticResource BoolToVis}}" />
             <views:PrivacyView DataContext="{Binding Privacy}"
                                Visibility="{Binding IsChecked, ElementName=NavPrivacy, Converter={StaticResource BoolToVis}}" />
+            <views:NetworkView DataContext="{Binding Network}"
+                               Visibility="{Binding IsChecked, ElementName=NavNetwork, Converter={StaticResource BoolToVis}}" />
             <views:UpdaterView DataContext="{Binding Updater}"
                                Visibility="{Binding IsChecked, ElementName=NavUpdates, Converter={StaticResource BoolToVis}}" />
             <!-- Zeitplan: Premium-Modul-View oder Locked-Ansicht (siehe MainViewModel) -->
@@ -344,9 +328,39 @@
                                   Visibility="{Binding IsChecked, ElementName=NavDuplicates, Converter={StaticResource BoolToVis}}" />
             <views:BackupHistoryView DataContext="{Binding BackupHistory}"
                                      Visibility="{Binding IsChecked, ElementName=NavRestore, Converter={StaticResource BoolToVis}}" />
-            <views:LicenseView DataContext="{Binding License}"
-                               Visibility="{Binding IsChecked, ElementName=NavLicense, Converter={StaticResource BoolToVis}}" />
+            <!-- Der eigenständige Lizenz-Bereich (früher via Sidebar-Pro-Karte) ist entfernt;
+                 Lizenz/Premium wird ausschließlich über den Einstellungsbereich (Zahnrad,
+                 eingebettete LicenseView) verwaltet. MainViewModel.License bleibt als geteilte
+                 Instanz für den Einstellungsbereich bestehen. -->
+            <!-- Zentraler Einstellungsbereich (Zahnrad). Sichtbarkeit über IsSettings am MainViewModel;
+                 der DataContext dieser View ist das SettingsViewModel, daher die Bindung an das
+                 Fenster-DataContext (= MainViewModel) auflösen. -->
+            <views:SettingsView DataContext="{Binding Settings}"
+                                Visibility="{Binding DataContext.IsSettings, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
             </Grid>
         </Grid>
+
+        <!-- Cyberpunk-Scanline: feines, nicht interaktives Linienraster; bei Cyberpunk stets sichtbar.
+             Der langsame vertikale Scroll (ScanlineShift) läuft nur ohne „Animationen reduzieren";
+             bei ReduceMotion bleibt die Scanline statisch sichtbar. -->
+        <Rectangle x:Name="ScanlineOverlay" Grid.Row="0" Grid.RowSpan="2"
+                   Grid.Column="0" Grid.ColumnSpan="2"
+                   IsHitTestVisible="False" Visibility="Collapsed" Opacity="0.13">
+            <Rectangle.Fill>
+                <DrawingBrush TileMode="Tile" Viewport="0,0,3,3" ViewportUnits="Absolute"
+                              Viewbox="0,0,3,3" ViewboxUnits="Absolute">
+                    <DrawingBrush.Transform>
+                        <TranslateTransform x:Name="ScanlineShift" />
+                    </DrawingBrush.Transform>
+                    <DrawingBrush.Drawing>
+                        <GeometryDrawing Brush="#FFFFFFFF">
+                            <GeometryDrawing.Geometry>
+                                <RectangleGeometry Rect="0,0,3,1" />
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                    </DrawingBrush.Drawing>
+                </DrawingBrush>
+            </Rectangle.Fill>
+        </Rectangle>
     </Grid>
 </Window>

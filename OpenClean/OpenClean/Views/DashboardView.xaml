@@ -192,7 +192,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="{Binding ScoreLabel}" Foreground="#FF10261F"
+                                <TextBlock Text="{Binding ScoreLabel}" Foreground="{DynamicResource OnAccentBrush}"
                                            FontWeight="SemiBold" FontSize="13" />
                             </Border>
                         </StackPanel>

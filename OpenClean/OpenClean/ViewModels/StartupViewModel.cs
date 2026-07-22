@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Data;
 using OpenClean.Services;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -38,6 +38,8 @@ public sealed class StartupViewModel : ViewModelBase
 {
     private readonly StartupService _service = new();
     private readonly DelayedStartupService _delayService;
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _ui;
 
     // Ladelauf-Zähler: bricht veraltete Icon-Hintergrundläufe ab, sobald neu geladen wird.
     private int _loadGeneration;
@@ -66,8 +68,10 @@ public sealed class StartupViewModel : ViewModelBase
     public IReadOnlyList<DelayOption> DelayOptions { get; } =
         DelayedStartupService.DelayOptions.Select(s => new DelayOption(s)).ToList();
 
-    public StartupViewModel()
+    public StartupViewModel(IDialogService? dialogs = null, IUiDispatcher? ui = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+        _ui = ui ?? UiDispatcher.Default;
         _delayService = new DelayedStartupService(_service);
 
         RefreshCommand = new AsyncRelayCommand(_ => LoadAsync());
@@ -169,8 +173,6 @@ public sealed class StartupViewModel : ViewModelBase
         var pending = Entries.Where(e => !string.IsNullOrWhiteSpace(e.IconPath)).ToList();
         if (pending.Count == 0) return;
 
-        var dispatcher = Application.Current?.Dispatcher;
-
         await Task.Run(() => Parallel.ForEach(pending,
             new ParallelOptions { MaxDegreeOfParallelism = 4 },
             (item, state) =>
@@ -179,7 +181,7 @@ public sealed class StartupViewModel : ViewModelBase
                 var icon = AppIconService.GetIcon(item.IconPath);
                 if (icon is null || generation != _loadGeneration) return;
 
-                dispatcher?.InvokeAsync(() =>
+                _ui.Post(() =>
                 {
                     if (generation == _loadGeneration)
                         item.SetIcon(icon);
@@ -209,9 +211,7 @@ public sealed class StartupViewModel : ViewModelBase
             return;
         }
 
-        var answer = MessageBox.Show(Loc.T("startup.stagger.confirm", targets.Count), "OpenClean",
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!_dialogs.AskYesNo(Loc.T("startup.stagger.confirm", targets.Count), "OpenClean")) return;
 
         // Stufen ohne die 0 – jeder weitere Eintrag landet auf der höchsten Stufe.
         int[] ladder = DelayedStartupService.DelayOptions.Where(s => s > 0).ToArray();
@@ -275,6 +275,6 @@ public sealed class StartupViewModel : ViewModelBase
             OnPropertyChanged(nameof(HasDelays));
     }
 
-    private static void ReportError(string message)
-        => MessageBox.Show(message, "OpenClean", MessageBoxButton.OK, MessageBoxImage.Warning);
+    private void ReportError(string message)
+        => _dialogs.ShowError(message);
 }

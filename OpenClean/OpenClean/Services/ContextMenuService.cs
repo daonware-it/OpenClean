@@ -156,7 +156,7 @@ public sealed class ContextMenuService
                 string command = ReadCommand(verbKey);
                 string? exe = string.IsNullOrWhiteSpace(command)
                     ? null
-                    : ResolveExisting(StartupService.SplitCommand(command).exe);
+                    : ResolveExisting(CommandLine.Split(command).exe);
 
                 entries.Add(new Raw(
                     Name: VerbDisplayName(verbKey, verb),
@@ -314,7 +314,7 @@ public sealed class ContextMenuService
                 if (string.IsNullOrWhiteSpace(path)) continue;
 
                 // LocalServer32 kann Argumente enthalten, InprocServer32 ist ein reiner Pfad.
-                string? candidate = ResolveExisting(StartupService.SplitCommand(path).exe)
+                string? candidate = ResolveExisting(CommandLine.Split(path).exe)
                                     ?? ResolveExisting(Environment.ExpandEnvironmentVariables(path.Trim('"')));
                 if (candidate is not null) return candidate;
             }

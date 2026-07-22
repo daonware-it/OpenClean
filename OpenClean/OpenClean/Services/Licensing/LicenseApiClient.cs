@@ -136,8 +136,7 @@ public sealed class LicenseApiClient
         _ => LicenseApiError.Network
     };
 
-    private static string AppVersion()
-        => typeof(LicenseApiClient).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    private static string AppVersion() => AppInfo.Version;
 
     private sealed class TokenRequest
     {

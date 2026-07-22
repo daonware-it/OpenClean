@@ -42,6 +42,15 @@ public sealed class RamWaveform : FrameworkElement
     private double _phase;        // Phase der Wellen-Textur
     private TimeSpan _lastTick;
 
+    // Wiederverwendeter Punktpuffer – wird bei jedem Frame neu befüllt, aber nicht neu alloziert.
+    private readonly Point[] _pts = new Point[SampleCount];
+
+    // Gecachte, eingefrorene Zeichenressourcen. Nur neu gebaut, wenn sich die Konturfarbe ändert
+    // (Theme-Wechsel oder Wechsel in/aus der kritischen Auslastung) – nicht pro Frame.
+    private Color _cachedColor;
+    private LinearGradientBrush? _cachedFill;
+    private Pen? _cachedPen;
+
     public RamWaveform()
     {
         // Kontinuierlich rendern, solange das Control sichtbar ist; sauber ab-/anmelden.
@@ -90,29 +99,52 @@ public sealed class RamWaveform : FrameworkElement
         if (w <= 1 || h <= 1) return;
 
         // Chronologisch geordnete Punkte (ältestes am Schreibindex) auf die Fläche abbilden.
-        var pts = new List<Point>(SampleCount);
         for (int i = 0; i < SampleCount; i++)
         {
             double v = _seeded ? _samples[(_writeIndex + i) % SampleCount] : 0;
             double x = SampleCount == 1 ? w : i / (double)(SampleCount - 1) * w;
             double y = h - Math.Clamp(v, 0, 100) / 100.0 * h;
-            pts.Add(new Point(x, y));
+            _pts[i] = new Point(x, y);
         }
 
         Color accent = ResolveColor("AccentBrush", Color.FromRgb(0x34, 0xD3, 0x99));
         bool critical = _current >= CriticalLevel;
         if (critical) accent = ResolveColor("DangerBrush", Color.FromRgb(0xF8, 0x71, 0x71));
 
-        // Gefüllte Fläche: Kurve → bis zur Unterkante → geschlossen.
+        EnsureBrushes(accent);
+
+        // Gefüllte Fläche: Kurve → bis zur Unterkante → geschlossen. Die Geometrie hängt an den
+        // Live-Daten und muss pro Frame neu gebaut werden; Farb-/Pinsel-Objekte dagegen nicht.
         var fill = new StreamGeometry();
         using (var ctx = fill.Open())
         {
             ctx.BeginFigure(new Point(0, h), true, true);
-            ctx.LineTo(pts[0], false, false);
-            AppendSmooth(ctx, pts);
+            ctx.LineTo(_pts[0], false, false);
+            AppendSmooth(ctx, _pts);
             ctx.LineTo(new Point(w, h), false, false);
         }
         fill.Freeze();
+        dc.DrawGeometry(_cachedFill, null, fill);
+
+        // Obere Konturlinie.
+        var line = new StreamGeometry();
+        using (var ctx = line.Open())
+        {
+            ctx.BeginFigure(_pts[0], false, false);
+            AppendSmooth(ctx, _pts);
+        }
+        line.Freeze();
+        dc.DrawGeometry(null, _cachedPen, line);
+    }
+
+    /// <summary>
+    /// Baut Verlaufsfüllung und Konturstift nur dann neu, wenn sich die Farbe geändert hat
+    /// (Theme-Wechsel oder Übergang in/aus der kritischen Auslastung). Beide werden eingefroren
+    /// und über Frames hinweg wiederverwendet.
+    /// </summary>
+    private void EnsureBrushes(Color accent)
+    {
+        if (_cachedFill != null && _cachedPen != null && accent == _cachedColor) return;
 
         var gradient = new LinearGradientBrush
         {
@@ -126,25 +158,20 @@ public sealed class RamWaveform : FrameworkElement
             }
         };
         gradient.Freeze();
-        dc.DrawGeometry(gradient, null, fill);
-
-        // Obere Konturlinie.
-        var line = new StreamGeometry();
-        using (var ctx = line.Open())
-        {
-            ctx.BeginFigure(pts[0], false, false);
-            AppendSmooth(ctx, pts);
-        }
-        line.Freeze();
 
         var stroke = new SolidColorBrush(accent);
         stroke.Freeze();
-        dc.DrawGeometry(null, new Pen(stroke, 2.0)
+        var pen = new Pen(stroke, 2.0)
         {
             LineJoin = PenLineJoin.Round,
             StartLineCap = PenLineCap.Round,
             EndLineCap = PenLineCap.Round
-        }, line);
+        };
+        pen.Freeze();
+
+        _cachedFill = gradient;
+        _cachedPen = pen;
+        _cachedColor = accent;
     }
 
     /// <summary>Fügt die Punkte als weiche Kurve (Mittelpunkt-Quadratik) an eine Figur an.</summary>

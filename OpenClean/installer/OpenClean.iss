@@ -1,10 +1,10 @@
-; Inno-Setup-Skript für OpenClean (v1.2.0).
+; Inno-Setup-Skript für OpenClean (v1.3.0).
 ; Baut einen klassischen Installer aus dem self-contained Publish-Verzeichnis.
 ; Die installierte App enthält KEINE OpenClean.portable-Marker-Datei und nutzt
 ; daher %AppData%\OpenClean für ihre Einstellungen (Portable-Modus nur beim .zip).
 ;
 ; Aufruf (siehe .github\workflows\release.yml):
-;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
+;   ISCC.exe /DAppVersion=1.3.0 /DSourceDir=..\publish\portable installer\OpenClean.iss
 ;
 ; Signierung: Der fertige Installer wird in der Release-Pipeline per Azure
 ; Trusted Signing signiert (siehe .github\workflows\release.yml). AppPublisher
@@ -13,7 +13,7 @@
 ; Nur der Rückfall für lokale Aufrufe ohne /DAppVersion – die Release-Pipeline reicht die
 ; Version aus der .csproj herein. Muss zu <Version> in OpenClean.csproj passen.
 #ifndef AppVersion
-  #define AppVersion "1.2.0"
+  #define AppVersion "1.3.0"
 #endif
 
 #ifndef SourceDir
@@ -50,7 +50,9 @@ SetupIconFile=..\OpenClean\Resources\openclean.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayName={#AppName} {#AppVersion}
+; Ohne Version: Der Store gleicht diesen Namen gegen ein Feld der Übermittlung ab,
+; das aus der Vorgänger-Übermittlung kopiert wird – mit Version bräche das je Release.
+UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
 
 [Languages]

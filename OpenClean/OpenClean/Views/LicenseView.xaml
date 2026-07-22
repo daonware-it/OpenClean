@@ -24,7 +24,11 @@
         </Style>
 
         <!-- Wert einer Detailzeile (Zahlen/Schlüssel monospaced) -->
+        <!-- Foreground explizit, da dieser eigenständige (nicht via BasedOn abgeleitete)
+             TextBlock-Style den impliziten Basis-Style aus App.xaml ersetzt und dessen
+             TextBrush-Setter sonst verloren geht → im Dark-Mode schwarze Schrift. -->
         <Style x:Key="DetailValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -33,20 +37,11 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="32,10,32,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- ===== Header ===== -->
-        <StackPanel Grid.Row="0" VerticalAlignment="Center">
-            <TextBlock Text="{loc:Loc license.title}" Style="{StaticResource HeaderText}" FontSize="24" />
-            <TextBlock Text="{loc:Loc license.subtitle}" Style="{StaticResource MutedText}" Margin="0,4,0,0" />
-        </StackPanel>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0" Padding="0,0,8,0">
-            <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+    <!-- Eingebetteter Inhaltsblock (nur in SettingsView gehostet): kein eigener Header,
+         kein eigener ScrollViewer und keine Breitenbegrenzung. Der äußere ScrollViewer und
+         die Breite kommen aus der SettingsView, damit die gesamte Seite als ein Container
+         scrollt und die Karten die verfügbare Breite füllen. -->
+    <StackPanel>
 
                 <!-- ===== Status (Hero) ===== -->
                 <Border Style="{StaticResource Card}" Padding="26,24">
@@ -181,7 +176,5 @@
 
                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}"
                            FontSize="12.5" Margin="2,14,0,10" TextWrapping="Wrap" />
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+    </StackPanel>
 </UserControl>

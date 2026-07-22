@@ -33,7 +33,7 @@ public sealed class UninstallItemViewModel : ViewModelBase
         // Größe aus der Registry; fehlt sie, eine bereits berechnete (gecachte) Ordnergröße nutzen.
         _sizeBytes = app.EstimatedBytes > 0
             ? app.EstimatedBytes
-            : InstalledAppsService.GetCachedFolderSize(app.SizeFolder);
+            : AppFolderSize.GetCached(app.SizeFolder);
         UninstallCommand = new AsyncRelayCommand(_ => RunAsync(), _ => CanUninstall && !IsBusy);
     }
 

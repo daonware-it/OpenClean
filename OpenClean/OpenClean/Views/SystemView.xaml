@@ -73,6 +73,53 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Ampel-Punkt je Gesundheitsstufe. Gleiche Trigger-Tabelle wie DriveBarStyle:
+             DataTrigger auf das Enum statt eines eigenen Konverters. -->
+        <Style x:Key="HealthDotStyle" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Warning">
+                    <Setter Property="Fill" Value="{DynamicResource WarnBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Failing">
+                    <Setter Property="Fill" Value="{DynamicResource DangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Unknown">
+                    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HealthTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Warning">
+                    <Setter Property="Foreground" Value="{DynamicResource WarnBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Failing">
+                    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Info.Health}" Value="Unknown">
+                    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Ein Detailwert im Pro-Bereich: Beschriftung oben, Zahl in MonoFont darunter. -->
+        <Style x:Key="HealthMetricValueStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <!-- Ohne explizite Foreground fiele der Wert auf WPF-Schwarz zurück und wäre im
+                 Dark-Mode unlesbar. Die zentrale, theme-fähige TextBrush sorgt in beiden Themes
+                 für vollen Kontrast (Dark hell, Light dunkel). -->
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="32,10,32,0">
@@ -145,15 +192,15 @@
                                     <Rectangle Width="9" Height="9" RadiusX="2" RadiusY="2"
                                                Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <TextBlock Text="{loc:Loc system.used}" Style="{StaticResource MutedText}" FontSize="12.5" />
-                                    <TextBlock Text="{Binding UsedRam}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
+                                    <TextBlock Text="{Binding UsedRam}" Style="{StaticResource MetricText}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="{loc:Loc system.free}" Style="{StaticResource MutedText}" FontSize="12.5" />
-                                    <TextBlock Text="{Binding AvailableRam}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
+                                    <TextBlock Text="{Binding AvailableRam}" Style="{StaticResource MetricText}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <TextBlock Text="{loc:Loc system.total}" Style="{StaticResource MutedText}" FontSize="12.5" />
-                                    <TextBlock Text="{Binding TotalRam}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
+                                    <TextBlock Text="{Binding TotalRam}" Style="{StaticResource MetricText}" FontSize="12.5" FontWeight="SemiBold" Margin="4,0,0,0" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -331,6 +378,184 @@
                                            FontSize="11.5" Margin="6,16,0,0" />
                             </StackPanel>
                         </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ==================== Datenträger-Gesundheit ==================== -->
+                <!-- 22px Abstand nach oben trennt die Karte konsistent von der Analyse-Karte
+                     darüber (gleiche Sektions-Distanz wie bei den übrigen Abschnitten). -->
+                <Border Style="{StaticResource Card}" Margin="0,22,0,12" Padding="20,16">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc system.health.title}" Style="{StaticResource HeaderText}" />
+                        <TextBlock Text="{loc:Loc system.health.subtitle}" Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                        <ProgressBar Style="{StaticResource LoadingBar}" Margin="0,12,0,0"
+                                     Visibility="{Binding IsDiskHealthLoading,
+                                                  Converter={StaticResource BoolToVis}}" />
+                        <TextBlock Text="{loc:Loc system.health.loading}" Style="{StaticResource MutedText}"
+                                   Margin="0,6,0,0"
+                                   Visibility="{Binding IsDiskHealthLoading,
+                                                Converter={StaticResource BoolToVis}}" />
+
+                        <TextBlock Text="{loc:Loc system.health.empty}" Style="{StaticResource MutedText}"
+                                   Margin="0,12,0,0"
+                                   Visibility="{Binding HasNoDiskHealth, Converter={StaticResource BoolToVis}}" />
+
+                        <ItemsControl ItemsSource="{Binding DiskHealth}" Margin="0,12,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource BgBrush}" CornerRadius="10"
+                                            Padding="14,12" Margin="0,0,0,8">
+                                        <StackPanel>
+                                            <!-- Kopfzeile: Ampel + Modell links, Kapazität rechts -->
+                                            <Grid>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Style="{StaticResource HealthDotStyle}"
+                                                             VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Info.Model}" FontSize="13.5"
+                                                               FontWeight="SemiBold" Margin="10,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" />
+
+                                                    <!-- SSD/HDD-Badge -->
+                                                    <Border CornerRadius="6" Padding="7,1" Margin="10,0,0,0"
+                                                            VerticalAlignment="Center"
+                                                            Background="{DynamicResource SurfaceBrush}"
+                                                            Visibility="{Binding Info.HasMediaType,
+                                                                         Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="{Binding Info.MediaTypeText}"
+                                                                   FontSize="10.5" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                                    </Border>
+
+                                                    <TextBlock Text="{Binding Info.LettersDisplay}"
+                                                               Style="{StaticResource MutedText}"
+                                                               FontSize="11.5" Margin="10,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding Info.HasLetters,
+                                                                            Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+
+                                                <TextBlock Text="{Binding Info.CapacityDisplay}"
+                                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource MonoFont}" FontSize="12.5"
+                                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                            </Grid>
+
+                                            <!-- Klartext der Ampel: das EINZIGE Urteil in der freien Fassung -->
+                                            <TextBlock Text="{Binding Info.HealthText}"
+                                                       Style="{StaticResource HealthTextStyle}"
+                                                       Margin="20,6,0,0" />
+
+                                            <!-- Aufklappen -->
+                                            <Button Command="{Binding ToggleCommand}" Cursor="Hand"
+                                                    HorizontalAlignment="Left" Margin="20,8,0,0"
+                                                    Background="Transparent" BorderThickness="0" Padding="0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{loc:Loc system.health.details}"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource InfoBrush}" />
+                                                    <!-- Schloss ohne Pro-Berechtigung (Muster: MainWindow.xaml) -->
+                                                    <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="10.5" Margin="6,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               Visibility="{Binding IsDetailLocked,
+                                                                            Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Detailbereich -->
+                                            <StackPanel Margin="20,10,0,0"
+                                                        Visibility="{Binding IsExpanded,
+                                                                     Converter={StaticResource BoolToVis}}">
+                                                <!-- Ohne Pro: Upsell statt Werte -->
+                                                <TextBlock Text="{loc:Loc system.health.detailsLocked}"
+                                                           Style="{StaticResource MutedText}" TextWrapping="Wrap"
+                                                           Visibility="{Binding IsDetailLocked,
+                                                                        Converter={StaticResource BoolToVis}}" />
+
+                                                <!-- Mit Pro, aber ohne Werte: ehrlicher Hinweis -->
+                                                <TextBlock Text="{Binding DetailsUnavailableText}"
+                                                           TextWrapping="Wrap">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock"
+                                                               BasedOn="{StaticResource MutedText}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding IsDetailLocked}"
+                                                                                   Value="False" />
+                                                                        <Condition Binding="{Binding HasDetails}"
+                                                                                   Value="False" />
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+
+                                                <!-- Mit Pro und Werten: die Einzelwerte -->
+                                                <WrapPanel Visibility="{Binding HasDetails,
+                                                                       Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.temp}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.TemperatureCelsius,
+                                                                          StringFormat={}{0} °C, TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.wear}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.WearRemainingPercent,
+                                                                          StringFormat={}{0} %, TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.poweronhours}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.PowerOnHours,
+                                                                          TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.powercycles}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.PowerCycles,
+                                                                          TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.reallocated}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.ReallocatedSectors,
+                                                                          TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.pending}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding Details.PendingSectors,
+                                                                          TargetNullValue=—}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,0,28,10" MinWidth="120">
+                                                        <TextBlock Text="{loc:Loc system.health.tbw}"
+                                                                   Style="{StaticResource TileCaption}" />
+                                                        <TextBlock Text="{Binding TotalWrittenDisplay}"
+                                                                   Style="{StaticResource HealthMetricValueStyle}" />
+                                                    </StackPanel>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
 

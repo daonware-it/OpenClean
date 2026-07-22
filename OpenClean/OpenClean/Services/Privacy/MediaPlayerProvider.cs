@@ -50,13 +50,6 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "vlc", "vlcrc");
 
-    // Schlüssel, die (je nach VLC-Version) die Recent-Liste tragen.
-    private static readonly string[] VlcRecentKeys =
-    {
-        "recentsmrl-list",
-        "qt-recentplay-list"
-    };
-
     // ---- WMP ---------------------------------------------------------------
 
     private const string WmpPlayerPath = @"Software\Microsoft\MediaPlayer\Player";
@@ -84,7 +77,7 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
 
             foreach (var line in File.ReadLines(path))
             {
-                if (TryParseVlcLine(line, out _, out var values) && values.Count > 0)
+                if (VlcRecentList.TryParseLine(line, out _, out var values) && values.Count > 0)
                     return true;
             }
         }
@@ -139,7 +132,7 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
             {
                 try
                 {
-                    if (!TryParseVlcLine(line, out var key, out var values)) continue;
+                    if (!VlcRecentList.TryParseLine(line, out var key, out var values)) continue;
 
                     foreach (var mrl in values)
                     {
@@ -147,8 +140,8 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
 
                         items.Add(new PrivacyItem
                         {
-                            Name = MrlToDisplayName(mrl),
-                            Detail = "VLC: " + MrlToPath(mrl),
+                            Name = VlcRecentList.MrlToDisplayName(mrl),
+                            Detail = "VLC: " + VlcRecentList.MrlToPath(mrl),
                             Tag = new MediaHandle(MediaSource.VlcIni, path, key, mrl)
                         });
                     }
@@ -248,7 +241,7 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
 
                     for (int i = 0; i < lines.Length; i++)
                     {
-                        if (!TryParseVlcLine(lines[i], out var key, out var values)) continue;
+                        if (!VlcRecentList.TryParseLine(lines[i], out var key, out var values)) continue;
                         if (!removeByKey.TryGetValue(key, out var toRemove)) continue;
 
                         var kept = values.Where(v => !toRemove.Contains(v)).ToList();
@@ -308,61 +301,6 @@ public sealed class MediaPlayerProvider : IPrivacyProvider
     }
 
     // ---- Hilfsfunktionen ---------------------------------------------------
-
-    /// <summary>
-    /// Prüft, ob eine vlcrc-Zeile eine bekannte Recent-Liste ist. Liefert den Schlüssel
-    /// und die (komma-getrennten, nicht-leeren) Werte. Kommentar-/Leerzeilen liefern false.
-    /// </summary>
-    private static bool TryParseVlcLine(string line, out string key, out List<string> values)
-    {
-        key = "";
-        values = new List<string>();
-
-        if (string.IsNullOrWhiteSpace(line)) return false;
-
-        string trimmed = line.TrimStart();
-        // Kommentare in vlcrc beginnen mit '#'.
-        if (trimmed.StartsWith('#')) return false;
-
-        int eq = trimmed.IndexOf('=');
-        if (eq <= 0) return false;
-
-        string candidate = trimmed[..eq].Trim();
-        if (!VlcRecentKeys.Contains(candidate, StringComparer.OrdinalIgnoreCase)) return false;
-
-        key = candidate;
-        string rhs = trimmed[(eq + 1)..];
-
-        foreach (var part in rhs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            values.Add(part);
-
-        return true;
-    }
-
-    /// <summary>Wandelt eine MRL (z. B. <c>file:///C:/Filme/x.mp4</c>) in den Dateinamen.</summary>
-    private static string MrlToDisplayName(string mrl)
-    {
-        try
-        {
-            string path = MrlToPath(mrl);
-            string name = Path.GetFileName(path);
-            return string.IsNullOrWhiteSpace(name) ? mrl : name;
-        }
-        catch { return mrl; }
-    }
-
-    /// <summary>Entschlüsselt eine MRL in einen lesbaren Pfad (file://-URIs -> lokaler Pfad).</summary>
-    private static string MrlToPath(string mrl)
-    {
-        try
-        {
-            if (Uri.TryCreate(mrl, UriKind.Absolute, out var uri) && uri.IsFile)
-                return uri.LocalPath;
-
-            return Uri.UnescapeDataString(mrl);
-        }
-        catch { return mrl; }
-    }
 
     /// <summary>Dateiname aus einem WMP-Pfad, robust gegen ungültige Pfade.</summary>
     private static string SafeFileName(string value)

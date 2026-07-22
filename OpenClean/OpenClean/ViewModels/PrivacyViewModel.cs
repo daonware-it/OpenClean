@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Text;
-using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Integrity;
-using OpenClean.Views;
+using OpenClean.Services.Privacy;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -14,13 +14,13 @@ namespace OpenClean.ViewModels;
 /// Kategorien, die eine Bestätigung erfordern (z. B. Cookies), erhalten eine
 /// besonders deutliche Warnung.
 /// </summary>
-public sealed class PrivacyViewModel : ViewModelBase
+public sealed class PrivacyViewModel : ScanViewModelBase
 {
     private readonly PrivacyScannerService _scanner = new();
+    private readonly IDialogService _dialogs;
 
     private bool _hasScanned;
     private bool _suppressSelectionCallback;
-    private bool _isBusy;
     private string _statusText = Loc.T("privacy.status.ready");
 
     private string _lastReportText = "";
@@ -28,13 +28,117 @@ public sealed class PrivacyViewModel : ViewModelBase
 
     public ObservableCollection<PrivacyGroup> Groups { get; } = new();
 
+    /// <summary>Domains, deren Browser-Cookies bei der Bereinigung geschützt sind (alphabetisch).</summary>
+    public ObservableCollection<string> WhitelistDomains { get; } = new();
+
+    /// <summary>
+    /// Angezeigtes Cookie-Inventar (aggregiert je Domain) – bereits nach
+    /// <see cref="CookieSearch"/> gefiltert. Die ungefilterte Menge steht in <see cref="_allCookies"/>.
+    /// </summary>
+    public ObservableCollection<CookieInventoryEntry> BrowserCookies { get; } = new();
+
+    /// <summary>Ungefiltertes Ergebnis des letzten Scans (Quelle der Wahrheit für den Filter).</summary>
+    private readonly List<CookieInventoryEntry> _allCookies = new();
+
+    private bool _cookiesLoaded;
+    private string _cookieHint = "";
+    private string _cookieSearch = "";
+
+    /// <summary>
+    /// Suchbegriff für das Cookie-Inventar. Filtert live nach Domain ODER Cookie-Name.
+    /// </summary>
+    public string CookieSearch
+    {
+        get => _cookieSearch;
+        set
+        {
+            if (SetProperty(ref _cookieSearch, value))
+                ApplyCookieFilter();
+        }
+    }
+
+    /// <summary>Ob überhaupt ein Suchbegriff gesetzt ist (steuert das „Leeren"-Kreuz).</summary>
+    public bool HasCookieSearch => !string.IsNullOrWhiteSpace(_cookieSearch);
+
+    /// <summary>Übernimmt <see cref="_allCookies"/> gefiltert in die angezeigte Liste.</summary>
+    private void ApplyCookieFilter()
+    {
+        BrowserCookies.Clear();
+        foreach (var entry in _allCookies)
+        {
+            if (entry.Matches(_cookieSearch))
+                BrowserCookies.Add(entry);
+        }
+
+        OnPropertyChanged(nameof(HasCookieSearch));
+        OnPropertyChanged(nameof(CookieEmptyText));
+        OnPropertyChanged(nameof(CookieCountText));
+    }
+
+    /// <summary>Zeigt „N von M Domains", solange gefiltert wird; sonst leer.</summary>
+    public string CookieCountText =>
+        HasCookieSearch && _allCookies.Count > 0
+            ? Loc.T("privacy.browserCookies.filtered", BrowserCookies.Count, _allCookies.Count)
+            : "";
+
+    /// <summary>
+    /// Hinweis, warum das Inventar leer/unvollständig ist (z. B. „Chrome läuft"). Leer,
+    /// wenn alle Cookie-DBs gelesen werden konnten.
+    /// </summary>
+    public string CookieHint
+    {
+        get => _cookieHint;
+        private set
+        {
+            if (SetProperty(ref _cookieHint, value))
+                OnPropertyChanged(nameof(HasCookieHint));
+        }
+    }
+
+    /// <summary>Ob ein Hinweis zum Cookie-Inventar anzuzeigen ist.</summary>
+    public bool HasCookieHint => !string.IsNullOrEmpty(_cookieHint);
+
+    /// <summary>
+    /// Text des Leerzustands: vor dem ersten Laden die Aufforderung, danach die Meldung,
+    /// dass wirklich keine Cookies gefunden wurden.
+    /// </summary>
+    public string CookieEmptyText
+    {
+        get
+        {
+            if (!_cookiesLoaded) return Loc.T("privacy.browserCookies.empty");
+            // Zwischen „gar keine Cookies" und „Suche ohne Treffer" unterscheiden.
+            if (_allCookies.Count > 0 && HasCookieSearch)
+                return Loc.T("privacy.browserCookies.noMatch", _cookieSearch.Trim());
+            return Loc.T("privacy.browserCookies.none");
+        }
+    }
+
     public AsyncRelayCommand ScanCommand { get; }
     public AsyncRelayCommand CleanCommand { get; }
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand DeselectAllCommand { get; }
+    public RelayCommand AddWhitelistCommand { get; }
+    public RelayCommand RemoveWhitelistCommand { get; }
+    public AsyncRelayCommand LoadCookiesCommand { get; }
+    public RelayCommand AddCookieToWhitelistCommand { get; }
 
-    public PrivacyViewModel()
+    private string _newWhitelistDomain = "";
+    /// <summary>Eingabefeld für eine neue Whitelist-Domain.</summary>
+    public string NewWhitelistDomain
     {
+        get => _newWhitelistDomain;
+        set
+        {
+            if (SetProperty(ref _newWhitelistDomain, value))
+                AddWhitelistCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public PrivacyViewModel(IDialogService? dialogs = null)
+    {
+        _dialogs = dialogs ?? DialogService.Default;
+
         // Nur verfügbare Provider werden als Kategorie angezeigt (install-gated).
         foreach (var provider in _scanner.AvailableProviders())
         {
@@ -47,23 +151,22 @@ public sealed class PrivacyViewModel : ViewModelBase
         CleanCommand = new AsyncRelayCommand(_ => CleanAsync(), _ => CanClean);
         SelectAllCommand = new RelayCommand(_ => SetAllSelection(true), _ => CanChangeSelection);
         DeselectAllCommand = new RelayCommand(_ => SetAllSelection(false), _ => CanChangeSelection);
+        AddWhitelistCommand = new RelayCommand(
+            _ => AddWhitelist(), _ => !string.IsNullOrWhiteSpace(NewWhitelistDomain));
+        RemoveWhitelistCommand = new RelayCommand(param => RemoveWhitelist(param as string));
+        LoadCookiesCommand = new AsyncRelayCommand(_ => LoadCookiesAsync(), _ => !IsBusy);
+        AddCookieToWhitelistCommand = new RelayCommand(
+            param => AddCookieToWhitelist(param as CookieInventoryEntry),
+            param => param is CookieInventoryEntry e && e.CanAdd);
+
+        // Command-Verfügbarkeit an den Busy-Zustand koppeln (Gerüst in ScanViewModelBase).
+        RegisterBusyCommands(ScanCommand, CleanCommand, SelectAllCommand, DeselectAllCommand, LoadCookiesCommand);
+
+        ReloadWhitelist();
     }
 
-    public bool IsBusy
-    {
-        get => _isBusy;
-        private set
-        {
-            if (SetProperty(ref _isBusy, value))
-            {
-                ScanCommand.RaiseCanExecuteChanged();
-                CleanCommand.RaiseCanExecuteChanged();
-                SelectAllCommand.RaiseCanExecuteChanged();
-                DeselectAllCommand.RaiseCanExecuteChanged();
-                OnPropertyChanged(nameof(CanChangeSelection));
-            }
-        }
-    }
+    /// <summary>Zusätzlich zur Command-Neubewertung hängt <see cref="CanChangeSelection"/> am Busy-Zustand.</summary>
+    protected override void OnBusyChanged() => OnPropertyChanged(nameof(CanChangeSelection));
 
     public string StatusText
     {
@@ -167,8 +270,7 @@ public sealed class PrivacyViewModel : ViewModelBase
         // ohne über einen der abgesicherten Services zu laufen.
         if (IntegrityState.IsBlocked)
         {
-            MessageBox.Show(Loc.T("integrity.blocked.action"), "OpenClean",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _dialogs.ShowError(Loc.T("integrity.blocked.action"));
             return;
         }
 
@@ -179,7 +281,7 @@ public sealed class PrivacyViewModel : ViewModelBase
         bool needsStrongWarning = affected.Any(g => g.RequiresConfirmation);
         string message = BuildConfirmMessage(affected, needsStrongWarning);
 
-        bool confirmed = ConfirmDialog.Show(Application.Current?.MainWindow, message);
+        bool confirmed = _dialogs.ConfirmThemed(message);
         if (!confirmed) return;
 
         IsBusy = true;
@@ -187,7 +289,7 @@ public sealed class PrivacyViewModel : ViewModelBase
 
         // Sicherheitsnetz: Vor dem Löschen echter Nutzerdaten einen Wiederherstellungspunkt anlegen.
         // Bricht der Nutzer am Fehler-Gate ab, wird nichts gelöscht.
-        if (!await SafetyPrompt.EnsureRestorePointAsync(Application.Current?.MainWindow, s => StatusText = s))
+        if (!await SafetyPrompt.EnsureRestorePointAsync(_dialogs, s => StatusText = s))
         {
             StatusText = Loc.T("safety.aborted");
             IsBusy = false;
@@ -234,6 +336,15 @@ public sealed class PrivacyViewModel : ViewModelBase
         if (strongWarning)
             sb.Append(Loc.T("privacy.confirm.cookieWarning"));
 
+        // Cookies sind dank Schattenkopie sichtbar, LÖSCHEN geht bei laufendem Browser aber
+        // nicht. Lieber vorher warnen als hinterher kommentarlos „0 gelöscht" melden.
+        if (affected.Any(g => g.Provider is CookiesProvider))
+        {
+            var locked = CookiesProvider.LockedBrowsers();
+            if (locked.Count > 0)
+                sb.Append(Loc.T("privacy.confirm.cookiesLocked", string.Join(", ", locked)));
+        }
+
         sb.Append(Loc.T("privacy.confirm.proceed"));
         return sb.ToString();
     }
@@ -249,10 +360,120 @@ public sealed class PrivacyViewModel : ViewModelBase
         DeselectAllCommand.RaiseCanExecuteChanged();
     }
 
+    /// <summary>Lädt die geschützten Domains neu aus dem Dienst (alphabetisch sortiert).</summary>
+    private void ReloadWhitelist()
+    {
+        WhitelistDomains.Clear();
+        foreach (var d in CookieWhitelistService.Instance.Domains)
+            WhitelistDomains.Add(d);
+    }
+
+    /// <summary>
+    /// Fügt die im Textfeld eingegebene Domain zur Cookie-Whitelist hinzu. Bei Erfolg wird
+    /// das Feld geleert, bei ungültiger Eingabe erscheint ein Hinweis.
+    /// </summary>
+    private void AddWhitelist()
+    {
+        // Erst hinzufügen (mit dem noch gefüllten Feldwert), dann bei Erfolg leeren.
+        if (AddDomainToWhitelist(NewWhitelistDomain))
+            NewWhitelistDomain = "";
+        else
+            StatusText = Loc.T("privacy.whitelist.invalid");
+    }
+
+    /// <summary>
+    /// Gemeinsame Logik zum Aufnehmen einer Domain in die Cookie-Whitelist. Aktualisiert bei
+    /// Erfolg die Liste, entfernt geschützte Vorschau-Einträge und pflegt den Inventar-Status.
+    /// </summary>
+    /// <returns><c>true</c>, wenn die Domain neu aufgenommen wurde.</returns>
+    private bool AddDomainToWhitelist(string? domain)
+    {
+        bool ok = CookieWhitelistService.Instance.Add(domain);
+        if (ok)
+        {
+            ReloadWhitelist();
+            PruneProtectedScannedItems();
+            RefreshCookieWhitelistFlags();
+            RefreshSelectionState();
+        }
+        return ok;
+    }
+
+    /// <summary>Nimmt bereits gescannte, nun geschützte Cookie-Einträge aus der Vorschau.</summary>
+    private void PruneProtectedScannedItems()
+    {
+        foreach (var group in Groups.Where(g => g.RequiresConfirmation))
+        {
+            var protectedItems = group.Items
+                .Where(i => CookieWhitelistService.Instance.Contains(i.Name))
+                .ToList();
+            foreach (var item in protectedItems)
+                group.Items.Remove(item);
+            group.RefreshTotals();
+        }
+    }
+
+    /// <summary>Entfernt eine Domain aus der Whitelist und lädt die Liste neu.</summary>
+    private void RemoveWhitelist(string? domain)
+    {
+        if (CookieWhitelistService.Instance.Remove(domain))
+        {
+            ReloadWhitelist();
+            RefreshCookieWhitelistFlags();
+        }
+    }
+
+    /// <summary>Gleicht den Whitelist-Status aller Inventar-Einträge mit dem Dienst ab.</summary>
+    private void RefreshCookieWhitelistFlags()
+    {
+        foreach (var entry in BrowserCookies)
+            entry.IsWhitelisted = CookieWhitelistService.Instance.Contains(entry.Domain);
+        AddCookieToWhitelistCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Liest read-only das Cookie-Inventar aller Browser und füllt <see cref="BrowserCookies"/>.
+    /// Fehler beim Scannen führen zu einer leeren Liste, nie zu einer Ausnahme.
+    /// </summary>
+    private async Task LoadCookiesAsync()
+    {
+        IsBusy = true;
+        StatusText = Loc.T("privacy.browserCookies.loading");
+
+        CookieInventoryService.CookieScanResult result;
+        try { result = await CookieInventoryService.Instance.ScanAsync(); }
+        catch { result = CookieInventoryService.CookieScanResult.Empty; }
+
+        _allCookies.Clear();
+        _allCookies.AddRange(result.Entries);
+        ApplyCookieFilter();
+        RefreshCookieWhitelistFlags();
+
+        // Gesperrte DBs (laufender Browser) sind der häufigste Grund für eine leere Liste –
+        // das muss der Nutzer sehen, sonst wirkt der Button wie kaputt.
+        CookieHint = result.LockedBrowsers.Count > 0
+            ? Loc.T("privacy.browserCookies.locked", string.Join(", ", result.LockedBrowsers))
+            : "";
+
+        _cookiesLoaded = true;
+        OnPropertyChanged(nameof(CookieEmptyText));
+
+        IsBusy = false;
+        StatusText = Loc.T("privacy.status.ready");
+    }
+
+    /// <summary>Nimmt die Domain eines Inventar-Eintrags in die Whitelist auf.</summary>
+    private void AddCookieToWhitelist(CookieInventoryEntry? entry)
+    {
+        if (entry is null) return;
+        AddDomainToWhitelist(entry.Domain);
+    }
+
     /// <summary>Aktualisiert nach einem Sprachwechsel alle berechneten Texte.</summary>
     public void Relocalize()
     {
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(CookieEmptyText));
         foreach (var group in Groups)
             group.RefreshLabels();
         if (!IsBusy && !_hasScanned)

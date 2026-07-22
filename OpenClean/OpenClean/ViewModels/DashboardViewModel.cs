@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using OpenClean.Models;
 using OpenClean.Services;
+using OpenClean.Services.Dashboard;
+using OpenClean.Services.DriveHealth;
 
 namespace OpenClean.ViewModels;
 
@@ -21,6 +23,8 @@ public sealed class DashboardViewModel : ViewModelBase
 
     private readonly DispatcherTimer _ramTimer;
     private bool _analyzed;
+    private bool _diskHealthLoaded;
+    private bool _isDiskHealthLoading;
 
     // ---- RAM ----
     private string _usedRam = "–";
@@ -48,6 +52,13 @@ public sealed class DashboardViewModel : ViewModelBase
     public ObservableCollection<DriveUsage> Drives { get; } = new();
     public ObservableCollection<ScoreFactor> ScoreFactors { get; } = new();
     public ObservableCollection<Recommendation> Recommendations { get; } = new();
+
+    /// <summary>
+    /// Gesundheit der physischen Datenträger. Wird NICHT beim Start gefüllt, sondern erst beim
+    /// ersten Öffnen des System-Bereichs (<see cref="EnsureDiskHealthLoaded"/>) – WMI ist
+    /// langsam und würde sonst den App-Start bremsen.
+    /// </summary>
+    public ObservableCollection<DriveHealthViewModel> DiskHealth { get; } = new();
 
     public AsyncRelayCommand RefreshCommand { get; }
     public RelayCommand RefreshRamCommand { get; }
@@ -175,6 +186,20 @@ public sealed class DashboardViewModel : ViewModelBase
 
     public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
 
+    /// <summary>True, solange der WMI-Scan läuft – steuert den Ladebalken der Health-Sektion.</summary>
+    public bool IsDiskHealthLoading
+    {
+        get => _isDiskHealthLoading;
+        private set
+        {
+            if (!SetProperty(ref _isDiskHealthLoading, value)) return;
+            OnPropertyChanged(nameof(HasNoDiskHealth));
+        }
+    }
+
+    /// <summary>True, wenn der Scan fertig ist und nichts gefunden hat – steuert den Leerzustand.</summary>
+    public bool HasNoDiskHealth => !_isDiskHealthLoading && _diskHealthLoaded && DiskHealth.Count == 0;
+
     /// <summary>Startet den RAM-Timer und – einmalig – die schwere Analyse.</summary>
     public void EnsureAnalyzed()
     {
@@ -182,6 +207,47 @@ public sealed class DashboardViewModel : ViewModelBase
         if (_analyzed) return;
         _analyzed = true;
         RefreshCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Startet einmalig den Gesundheits-Scan der Datenträger. Wird vom
+    /// <c>MainViewModel</c> beim ersten Öffnen des System-Bereichs aufgerufen.
+    ///
+    /// <para>Bewusst „fire and forget“ mit eigener Fehlerbehandlung: die Sektion ist rein
+    /// informativ; scheitert der Scan, bleibt die Liste leer und der Leerzustand erscheint –
+    /// das darf weder den System-Bereich blockieren noch die App stören.</para>
+    /// </summary>
+    public void EnsureDiskHealthLoaded()
+    {
+        if (_diskHealthLoaded || _isDiskHealthLoading) return;
+
+        IsDiskHealthLoading = true;
+
+        _ = LoadDiskHealthAsync();
+    }
+
+    private async Task LoadDiskHealthAsync()
+    {
+        try
+        {
+            // WMI blockiert – niemals auf dem UI-Thread.
+            IReadOnlyList<DriveHealthInfo> drives =
+                await Task.Run(() => DriveHealthService.Instance.GetDriveHealth()).ConfigureAwait(true);
+
+            DiskHealth.Clear();
+            foreach (DriveHealthInfo drive in drives)
+                DiskHealth.Add(new DriveHealthViewModel(drive));
+        }
+        catch
+        {
+            DiskHealth.Clear();
+        }
+        finally
+        {
+            _diskHealthLoaded = true;
+            IsDiskHealthLoading = false;
+            OnPropertyChanged(nameof(HasNoDiskHealth));
+        }
     }
 
     /// <summary>Recomputet ALLES: RAM, Laufwerke, Startup, Temp, Score und Empfehlungen.</summary>
@@ -246,75 +312,12 @@ public sealed class DashboardViewModel : ViewModelBase
 
     private void ComputeScore()
     {
-        int score = 100;
-        var factors = new List<ScoreFactor>();
-
-        void Penalty(int points, ScoreFactorKind kind, string description)
-        {
-            if (points <= 0) return;
-            score -= points;
-            factors.Add(new ScoreFactor(description, -points, kind));
-        }
-
-        // 1) Speicherplatz je Laufwerk (echte DriveInfo-Werte).
-        foreach (var drive in Drives)
-        {
-            double freePct = drive.FreePercent;
-            if (freePct < 10)
-                Penalty(25, ScoreFactorKind.Storage, Loc.T("score.factor.driveCritical", drive.Letter, freePct.ToString("0")));
-            else if (freePct < 20)
-                Penalty(10, ScoreFactorKind.Storage, Loc.T("score.factor.driveLow", drive.Letter, freePct.ToString("0")));
-        }
-
-        // 2) Bereinigbare Temp-/Cache-Größe (echtes ScanAll-Ergebnis).
-        double tempGb = _tempBytes / (1024.0 * 1024 * 1024);
-        double tempMb = _tempBytes / (1024.0 * 1024);
-        if (tempGb > 5)
-            Penalty(20, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
-        else if (tempGb > 1)
-            Penalty(10, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
-        else if (tempMb > 200)
-            Penalty(5, ScoreFactorKind.Reclaimable, Loc.T("score.factor.reclaimable", ByteFormatter.Format(_tempBytes)));
-
-        // 3) Autostart (echte StartupService-Daten).
-        if (_startupEnabled > 20)
-            Penalty(15, ScoreFactorKind.Startup, Loc.T("score.factor.startupActive", _startupEnabled));
-        else if (_startupEnabled > 10)
-            Penalty(8, ScoreFactorKind.Startup, Loc.T("score.factor.startupActive", _startupEnabled));
-
-        if (_startupHighImpact > 0)
-        {
-            int highPenalty = Math.Min(_startupHighImpact * 3, 12);
-            Penalty(highPenalty, ScoreFactorKind.Startup, Loc.T("score.factor.startupHigh", _startupHighImpact));
-        }
-
-        // 4) RAM-Auslastung (echtes dwMemoryLoad).
-        if (_ramValid)
-        {
-            if (_ramPercent > 90)
-                Penalty(15, ScoreFactorKind.Ram, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
-            else if (_ramPercent > 80)
-                Penalty(8, ScoreFactorKind.Ram, Loc.T("score.factor.ramLoad", _ramPercent.ToString("0")));
-        }
-
-        score = Math.Clamp(score, 0, 100);
-
-        var (level, label) = score >= 80
-            ? (ScoreLevel.Good, Loc.T("score.good"))
-            : score >= 50
-                ? (ScoreLevel.Improvable, Loc.T("score.improvable"))
-                : (ScoreLevel.Critical, Loc.T("score.critical"));
-
-        _score = new ScoreResult
-        {
-            Score = score,
-            Level = level,
-            Label = label,
-            Factors = factors
-        };
+        // Reine Rechen-Engine (WPF-frei, testbar); das VM sammelt nur die Messwerte
+        // und spiegelt das Ergebnis in seine gebundenen Collections/Properties.
+        _score = SystemScoreCalculator.Compute(CollectMeasurements());
 
         ScoreFactors.Clear();
-        foreach (var f in factors)
+        foreach (var f in _score.Factors)
             ScoreFactors.Add(f);
 
         OnPropertyChanged(nameof(Score));
@@ -322,6 +325,17 @@ public sealed class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(ScoreLevel));
         OnPropertyChanged(nameof(HasScoreFactors));
         OnPropertyChanged(nameof(ScoreExplanation));
+    }
+
+    /// <summary>Sammelt die aktuellen Roh-Messwerte für Score-/Empfehlungs-Engine.</summary>
+    private SystemMeasurements CollectMeasurements()
+    {
+        var drives = Drives
+            .Select(d => new DriveMeasurement(d.Letter, d.FreePercent, d.UsedPercent, d.FreeDisplay))
+            .ToList();
+
+        return new SystemMeasurements(
+            drives, _tempBytes, _tempItems, _startupEnabled, _startupHighImpact, _ramValid, _ramPercent);
     }
 
     public bool HasScoreFactors => ScoreFactors.Count > 0;
@@ -335,112 +349,27 @@ public sealed class DashboardViewModel : ViewModelBase
     private void BuildRecommendations()
     {
         Recommendations.Clear();
-        var list = new List<Recommendation>();
 
-        double tempMb = _tempBytes / (1024.0 * 1024);
-        if (tempMb > 200)
-        {
-            var severity = tempMb > 1024 ? RecommendationSeverity.Warning : RecommendationSeverity.Info;
-            list.Add(new Recommendation
+        // Nebenwirkungen (Navigation, Bereinigungs-Scan, RAM-Refresh) als Aktions-Bündel an
+        // die reine Engine reichen; das „In Bereinigung wechseln und scannen“ bleibt identisch.
+        var actions = new RecommendationActions(
+            _navigate,
+            new RelayCommand(_ =>
             {
-                Title = Loc.T("reco.reclaimable.title", ByteFormatter.Format(_tempBytes)),
-                Text = Loc.T("reco.reclaimable.text", _tempItems),
-                Severity = severity,
-                Kind = RecommendationKind.Reclaimable,
-                SeverityTag = SeverityTag(severity),
-                ValueDisplay = ByteFormatter.Format(_tempBytes),
-                ValueUnit = Loc.T("reco.unit.reclaimable"),
-                ActionLabel = Loc.T("common.clean"),
-                ActionCommand = new RelayCommand(_ =>
-                {
-                    _navigate(AppSection.Bereinigung);
-                    if (_cleaner.ScanCommand.CanExecute(null))
-                        _cleaner.ScanCommand.Execute(null);
-                })
-            });
-        }
+                _navigate(AppSection.Bereinigung);
+                if (_cleaner.ScanCommand.CanExecute(null))
+                    _cleaner.ScanCommand.Execute(null);
+            }),
+            RefreshRamCommand);
 
-        // Laufwerke mit kritisch/knapp wenig Speicher.
-        foreach (var drive in Drives.Where(d => d.FreePercent < 15))
-        {
-            var severity = drive.FreePercent < 10 ? RecommendationSeverity.Critical : RecommendationSeverity.Warning;
-            list.Add(new Recommendation
-            {
-                Title = Loc.T("reco.driveFull.title", drive.Letter, drive.UsedPercent.ToString("0")),
-                Text = Loc.T("reco.driveFull.text", drive.FreeDisplay),
-                Severity = severity,
-                Kind = RecommendationKind.Storage,
-                SeverityTag = SeverityTag(severity),
-                ValueDisplay = drive.FreeDisplay,
-                ValueUnit = Loc.T("reco.unit.free"),
-                ActionLabel = Loc.T("reco.action.check"),
-                ActionCommand = new RelayCommand(_ => _navigate(AppSection.Bereinigung))
-            });
-        }
-
-        if (_startupEnabled > 10 || _startupHighImpact > 0)
-        {
-            var severity = _startupHighImpact > 0 ? RecommendationSeverity.Warning : RecommendationSeverity.Info;
-            list.Add(new Recommendation
-            {
-                Title = Loc.T("reco.startup.title", _startupEnabled),
-                Text = Loc.T("reco.startup.text", _startupHighImpact),
-                Severity = severity,
-                Kind = RecommendationKind.Startup,
-                SeverityTag = SeverityTag(severity),
-                ValueDisplay = _startupEnabled.ToString(),
-                ValueUnit = Loc.T("reco.unit.active"),
-                ActionLabel = Loc.T("reco.action.view"),
-                ActionCommand = new RelayCommand(_ => _navigate(AppSection.Autostart))
-            });
-        }
-
-        // RAM: rein informativ – KEINE „RAM-Booster“-Aktion (wäre Fake), nur Aktualisieren.
-        if (_ramValid && _ramPercent > 85)
-        {
-            list.Add(new Recommendation
-            {
-                Title = Loc.T("reco.ram.title", _ramPercent.ToString("0")),
-                Text = Loc.T("reco.ram.text"),
-                Severity = RecommendationSeverity.Info,
-                Kind = RecommendationKind.Ram,
-                SeverityTag = SeverityTag(RecommendationSeverity.Info),
-                ValueDisplay = _ramPercent.ToString("0") + " %",
-                ValueUnit = Loc.T("reco.unit.load"),
-                ActionLabel = Loc.T("common.refresh"),
-                ActionCommand = RefreshRamCommand
-            });
-        }
-
-        if (list.Count == 0)
-        {
-            list.Add(new Recommendation
-            {
-                Title = Loc.T("reco.allGood.title"),
-                Text = Loc.T("reco.allGood.text"),
-                Severity = RecommendationSeverity.Positive,
-                Kind = RecommendationKind.AllGood,
-                SeverityTag = SeverityTag(RecommendationSeverity.Positive)
-            });
-        }
-
-        // Dringlichste zuerst (Kritisch → Warnung → Hinweis), Reihenfolge sonst stabil.
-        foreach (var r in list.OrderByDescending(r => (int)r.Severity))
+        // Die Engine liefert bereits dringlichste zuerst (Kritisch → Warnung → Hinweis).
+        foreach (var r in RecommendationBuilder.Build(CollectMeasurements(), actions))
             Recommendations.Add(r);
 
         OnPropertyChanged(nameof(HasRecommendations));
         OnPropertyChanged(nameof(RecommendationCount));
         OnPropertyChanged(nameof(HasActionableRecommendations));
     }
-
-    /// <summary>Lokalisierter Status-Tag je Dringlichkeit (Kritisch/Empfohlen/Hinweis/Optimal).</summary>
-    private static string SeverityTag(RecommendationSeverity severity) => severity switch
-    {
-        RecommendationSeverity.Critical => Loc.T("reco.tag.critical"),
-        RecommendationSeverity.Warning => Loc.T("reco.tag.recommended"),
-        RecommendationSeverity.Info => Loc.T("reco.tag.hint"),
-        _ => Loc.T("reco.tag.good")
-    };
 
     /// <summary>Führt die sinnvollen Empfehlungs-Aktionen aus („Alle ausführen“).</summary>
     private void RunAllRecommendations()
@@ -478,6 +407,9 @@ public sealed class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(StartupSummary));
         OnPropertyChanged(nameof(TempReclaimable));
         OnPropertyChanged(nameof(TempSummary));
+
+        foreach (DriveHealthViewModel drive in DiskHealth)
+            drive.Relocalize();
 
         if (_analyzed && !IsBusy)
         {

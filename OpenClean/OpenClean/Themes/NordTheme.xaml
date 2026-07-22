@@ -1,0 +1,50 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============ Nord ============ -->
+    <Color x:Key="BgDeepColor">#FF2B303B</Color>
+    <Color x:Key="BgColor">#FF2E3440</Color>
+    <Color x:Key="BgRaisedColor">#FF3B4252</Color>
+    <Color x:Key="SurfaceColor">#FF3B4252</Color>
+    <Color x:Key="SurfaceHoverColor">#FF434C5E</Color>
+    <Color x:Key="BorderColor">#FF4C566A</Color>
+    <Color x:Key="AccentColor">#FF88C0D0</Color>
+    <Color x:Key="AccentDarkColor">#FF6FA8B8</Color>
+    <Color x:Key="AccentSoftColor">#2688C0D0</Color>
+    <Color x:Key="OnAccentColor">#FF0C201A</Color>
+    <Color x:Key="TextColor">#FFECEFF4</Color>
+    <Color x:Key="TextMutedColor">#FF9AA4B8</Color>
+    <Color x:Key="DangerColor">#FFBF616A</Color>
+    <Color x:Key="WarnColor">#FFEBCB8B</Color>
+    <Color x:Key="InfoColor">#FF81A1C1</Color>
+
+    <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource BgDeepColor}" />
+    <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
+    <SolidColorBrush x:Key="BgRaisedBrush" Color="{StaticResource BgRaisedColor}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="{StaticResource AccentDarkColor}" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoftColor}" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="{StaticResource OnAccentColor}" />
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    <SolidColorBrush x:Key="WarnBrush" Color="{StaticResource WarnColor}" />
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}" />
+
+    <!-- Weiche Tönungen für Icon-Badges/Status-Tags (Empfehlungen). -->
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="#26BF616A" />
+    <SolidColorBrush x:Key="WarnSoftBrush" Color="#26EBCB8B" />
+    <SolidColorBrush x:Key="InfoSoftBrush" Color="#2681A1C1" />
+
+    <!-- Dezenter Akzent-Glow für Hero-Karten (oben rechts, nach außen transparent). -->
+    <RadialGradientBrush x:Key="HeroGlowBrush"
+                         GradientOrigin="0.85,0.12" Center="0.85,0.12"
+                         RadiusX="0.85" RadiusY="1.3">
+        <GradientStop Color="#3088C0D0" Offset="0" />
+        <GradientStop Color="#0088C0D0" Offset="1" />
+    </RadialGradientBrush>
+
+</ResourceDictionary>

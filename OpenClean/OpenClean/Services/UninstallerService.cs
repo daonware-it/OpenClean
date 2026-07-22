@@ -29,7 +29,7 @@ public sealed class UninstallerService
         string? command = ChooseCommand(app, silent);
         if (string.IsNullOrWhiteSpace(command)) return false;
 
-        var (exe, args) = SplitCommand(command);
+        var (exe, args) = CommandLine.Split(command);
         if (string.IsNullOrWhiteSpace(exe)) return false;
 
         try
@@ -84,27 +84,4 @@ public sealed class UninstallerService
         return null;
     }
 
-    /// <summary>
-    /// Zerlegt ein Kommando in ausführbare Datei + Argumente. Berücksichtigt einen
-    /// quotierten Pfad ("C:\…\uninst.exe" /S) ebenso wie unquotierte Kommandos
-    /// (MsiExec.exe /X{GUID}).
-    /// </summary>
-    private static (string exe, string args) SplitCommand(string command)
-    {
-        command = Environment.ExpandEnvironmentVariables(command).Trim();
-        if (command.Length == 0) return ("", "");
-
-        if (command.StartsWith('"'))
-        {
-            int end = command.IndexOf('"', 1);
-            if (end > 0)
-                return (command.Substring(1, end - 1), command[(end + 1)..].Trim());
-            return (command.Trim('"'), "");
-        }
-
-        int space = command.IndexOf(' ');
-        return space > 0
-            ? (command[..space], command[(space + 1)..].Trim())
-            : (command, "");
-    }
 }

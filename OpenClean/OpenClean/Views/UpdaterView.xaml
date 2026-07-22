@@ -148,9 +148,29 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,4">
-                <ItemsControl ItemsSource="{Binding Updates}">
-                    <ItemsControl.ItemTemplate>
+            <ListBox ItemsSource="{Binding Updates}"
+                     Background="Transparent" BorderThickness="0" Padding="6,4"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <!-- Container reicht nur durch: kein Auswahl-/Fokus-Highlight;
+                             Hover und Abstände liefert die Zeile im DataTemplate selbst. -->
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter HorizontalAlignment="Stretch" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border x:Name="row" Background="Transparent" CornerRadius="8"
                                     Padding="12,12" Margin="0,1">
@@ -229,9 +249,8 @@
                                 </Trigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </ListBox.ItemTemplate>
+                </ListBox>
         </Border>
 
         <!-- ===== Status bar ===== -->

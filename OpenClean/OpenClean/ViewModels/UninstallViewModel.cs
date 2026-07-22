@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Data;
 using OpenClean.Contracts;
 using OpenClean.Models;
@@ -8,7 +7,7 @@ using OpenClean.Services;
 using OpenClean.Services.Integrity;
 using OpenClean.Services.Licensing;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -20,13 +19,14 @@ public enum UninstallSort { Groesse, Name }
 /// einzelne und mehrfache (Batch-)Deinstallation und findet – nach dem Entfernen –
 /// zurückgebliebene Ordner/Registry-Reste zur gründlichen Bereinigung.
 /// </summary>
-public sealed class UninstallViewModel : ViewModelBase
+public sealed class UninstallViewModel : ScanViewModelBase
 {
     private readonly InstalledAppsService _inventory = new();
     private readonly UninstallerService _uninstaller = new();
     private readonly LeftoverScannerService _leftoverScanner = new();
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _ui;
 
-    private bool _isBusy;
     private string _statusText = Loc.T("uninstall.status.loading");
     private string _searchText = "";
     private UninstallSort _sort = UninstallSort.Groesse;
@@ -50,8 +50,11 @@ public sealed class UninstallViewModel : ViewModelBase
     public RelayCommand SortBySizeCommand { get; }
     public RelayCommand SortByNameCommand { get; }
 
-    public UninstallViewModel()
+    public UninstallViewModel(IDialogService? dialogs = null, IUiDispatcher? ui = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+        _ui = ui ?? UiDispatcher.Default;
+
         RefreshCommand = new AsyncRelayCommand(_ => LoadAsync(), _ => !IsBusy);
         // !IntegrityState.IsBlocked: bei erkannter Manipulation (OPCL-20) sind Deinstallation
         // und Reste-Löschen gesperrt; die Liste selbst bleibt einsehbar.
@@ -69,12 +72,14 @@ public sealed class UninstallViewModel : ViewModelBase
         });
         SortByNameCommand = new RelayCommand(_ => Sort = UninstallSort.Name);
 
+        // Command-Verfügbarkeit an den Busy-Zustand koppeln (Gerüst in ScanViewModelBase).
+        RegisterBusyCommands(RefreshCommand, UninstallSelectedCommand, RemoveLeftoversCommand);
+
         // Schloss-Badge am Batch-Button aktuell halten: nach Aktivierung/Widerruf neu bewerten.
         PremiumService.Instance.Changed += (_, _) =>
         {
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher is null || dispatcher.CheckAccess()) OnPropertyChanged(nameof(IsBatchLocked));
-            else dispatcher.InvokeAsync(() => OnPropertyChanged(nameof(IsBatchLocked)));
+            if (_ui.CheckAccess()) OnPropertyChanged(nameof(IsBatchLocked));
+            else _ui.Post(() => OnPropertyChanged(nameof(IsBatchLocked)));
         };
 
         AppsView = CollectionViewSource.GetDefaultView(Apps);
@@ -95,20 +100,6 @@ public sealed class UninstallViewModel : ViewModelBase
     }
 
     // ---- Eigenschaften ------------------------------------------------------
-
-    public bool IsBusy
-    {
-        get => _isBusy;
-        private set
-        {
-            if (SetProperty(ref _isBusy, value))
-            {
-                RefreshCommand.RaiseCanExecuteChanged();
-                UninstallSelectedCommand.RaiseCanExecuteChanged();
-                RemoveLeftoversCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
 
     public string StatusText
     {
@@ -207,10 +198,22 @@ public sealed class UninstallViewModel : ViewModelBase
 
         var apps = await Task.Run(() => _inventory.GetInstalledApps());
 
+        // Massenbefüllung: Live-Sortierung während des Einfügens aussetzen, sonst sortiert
+        // jeder einzelne Add die Ansicht neu ein (teuer bei hunderten Programmen). Danach
+        // EINMAL sortieren (ApplySort). Bewusst KEIN AppsView.DeferRefresh(): die an eine
+        // Selector-ListBox gebundene, live-sortierende CollectionView prüft bei jedem Add die
+        // CurrentPosition und wirft, wenn ein Refresh gerade zurückgestellt ist (OPCL-Bug:
+        // erster Add scheitert -> Liste bleibt komplett leer).
+        var live = AppsView as ICollectionViewLiveShaping;
+        bool wasLiveSorting = live is { IsLiveSorting: true };
+        if (live is not null) live.IsLiveSorting = false;
+        AppsView.SortDescriptions.Clear();
+
         Apps.Clear();
         foreach (var app in apps.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase))
             Apps.Add(new UninstallItemViewModel(app, UninstallOneAsync, OnSelectionChanged));
 
+        if (live is not null) live.IsLiveSorting = wasLiveSorting;
         ApplySort();
         UpdateSizeBars();
         IsBusy = false;
@@ -238,8 +241,6 @@ public sealed class UninstallViewModel : ViewModelBase
         var pending = Apps.Where(a => !string.IsNullOrWhiteSpace(a.IconPath)).ToList();
         if (pending.Count == 0) return;
 
-        var dispatcher = Application.Current?.Dispatcher;
-
         await Task.Run(() => Parallel.ForEach(pending,
             new ParallelOptions { MaxDegreeOfParallelism = 4 },
             (item, state) =>
@@ -248,7 +249,7 @@ public sealed class UninstallViewModel : ViewModelBase
                 var icon = AppIconService.GetIcon(item.IconPath);
                 if (icon is null || generation != _loadGeneration) return;
 
-                dispatcher?.InvokeAsync(() =>
+                _ui.Post(() =>
                 {
                     if (generation != _loadGeneration) return;
                     item.SetIcon(icon);
@@ -265,8 +266,6 @@ public sealed class UninstallViewModel : ViewModelBase
         var pending = Apps.Where(a => a.NeedsSizeCalculation).ToList();
         if (pending.Count == 0) return;
 
-        var dispatcher = Application.Current?.Dispatcher;
-
         // Mehrere Ordner gleichzeitig vermessen (I/O-lastig) – sonst dauert es bei vielen
         // Spielen sehr lange, bis alle Größen erscheinen. UI-Updates über den Dispatcher.
         await Task.Run(() => Parallel.ForEach(pending,
@@ -274,10 +273,10 @@ public sealed class UninstallViewModel : ViewModelBase
             (item, state) =>
             {
                 if (generation != _loadGeneration) { state.Stop(); return; } // neuer Load -> abbrechen
-                long size = InstalledAppsService.TryGetFolderSize(item.SizeFolder);
+                long size = AppFolderSize.TryGet(item.SizeFolder);
                 if (size <= 0 || generation != _loadGeneration) return;
 
-                dispatcher?.InvokeAsync(() =>
+                _ui.Post(() =>
                 {
                     if (generation != _loadGeneration) return;
                     // Live-Sortierung ordnet die Zeile automatisch neu ein (kein harter Refresh).
@@ -324,8 +323,7 @@ public sealed class UninstallViewModel : ViewModelBase
     {
         if (IsBusy) return;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("uninstall.confirm.single", item.Name),
             Loc.T("uninstall.confirm.title"),
             Loc.T("uninstall.action.uninstall"));
@@ -363,21 +361,19 @@ public sealed class UninstallViewModel : ViewModelBase
         if (selected.Count > 1 &&
             !PremiumService.Instance.HasFeature(PremiumContract.FeatureBatchUninstall))
         {
-            bool wantsActivation = ConfirmDialog.Show(
-                Application.Current?.MainWindow,
+            bool wantsActivation = _dialogs.ConfirmThemed(
                 Loc.T("premium.batch.locked"),
                 Loc.T("premium.locked.title"),
                 Loc.T("premium.action.activate"));
             if (wantsActivation)
-                ActivationDialog.Show(Application.Current?.MainWindow);
+                _dialogs.ActivateLicense();
 
             // Nach dem Dialog erneut prüfen – ohne frisch aktivierte Lizenz abbrechen.
             if (!PremiumService.Instance.HasFeature(PremiumContract.FeatureBatchUninstall))
                 return;
         }
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("uninstall.confirm.batch", selected.Count),
             Loc.T("uninstall.confirm.title"),
             Loc.T("uninstall.action.uninstallSelected"));
@@ -500,8 +496,7 @@ public sealed class UninstallViewModel : ViewModelBase
         if (selected.Count == 0) return;
 
         long bytes = selected.Where(l => !l.IsRegistry).Sum(l => l.SizeBytes);
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("uninstall.leftover.confirm", selected.Count, ByteFormatter.Format(bytes)),
             Loc.T("uninstall.leftover.confirmTitle"),
             Loc.T("uninstall.leftover.action"));
@@ -509,7 +504,7 @@ public sealed class UninstallViewModel : ViewModelBase
 
         // Sicherheitsnetz vorbereiten (Wiederherstellungspunkt + Datei-Backup/Undo).
         // Läuft VOR dem IsBusy-Wechsel, damit ein Abbruch den Zustand unberührt lässt.
-        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(Application.Current?.MainWindow, "leftover");
+        SafetyPreparation prep = await SafetyPrompt.PrepareAsync(_dialogs, "leftover");
         if (!prep.Proceed)
         {
             StatusText = Loc.T("safety.aborted");

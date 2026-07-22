@@ -1,8 +1,6 @@
-using System.Windows;
-using System.Windows.Interop;
 using OpenClean.Services;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -25,16 +23,16 @@ public static class SafetyPrompt
     /// (z. B. „Wiederherstellungspunkt wird erstellt …"). Gibt <c>Proceed = false</c> zurück,
     /// wenn der Nutzer nach einem fehlgeschlagenen Wiederherstellungspunkt abbricht.
     /// </summary>
-    public static async Task<SafetyPreparation> PrepareAsync(Window? owner, string area, Action<string>? status = null)
+    public static async Task<SafetyPreparation> PrepareAsync(IDialogService dialogs, string area, Action<string>? status = null)
     {
-        if (!await EnsureRestorePointAsync(owner, status))
+        if (!await EnsureRestorePointAsync(dialogs, status))
             return new SafetyPreparation(false, null);
 
         BackupSession? session = null;
         if (SettingsService.Instance.Current.Safety.BackupBeforeDelete)
         {
             // Handle des Eigentümerfensters für einen etwaigen Papierkorb-Nuke-Dialog beschaffen.
-            IntPtr hwnd = owner is not null ? new WindowInteropHelper(owner).Handle : IntPtr.Zero;
+            IntPtr hwnd = dialogs.OwnerHandle;
             session = BackupService.Instance.BeginSession(area, hwnd);
         }
 
@@ -46,7 +44,7 @@ public static class SafetyPrompt
     /// den Punkt und fragt bei Fehlschlag „trotzdem fortfahren?". Gibt <c>false</c> zurück, wenn der
     /// Nutzer abbricht. Für Bereiche, die ihr Datei-Backup selbst kapseln (z. B. Privatsphäre-Provider).
     /// </summary>
-    public static async Task<bool> EnsureRestorePointAsync(Window? owner, Action<string>? status = null)
+    public static async Task<bool> EnsureRestorePointAsync(IDialogService dialogs, Action<string>? status = null)
     {
         if (!SettingsService.Instance.Current.Safety.CreateRestorePoint)
             return true;
@@ -59,8 +57,7 @@ public static class SafetyPrompt
         if (result.IsSafeToContinue)
             return true;
 
-        return ConfirmDialog.Show(
-            owner,
+        return dialogs.ConfirmThemed(
             Loc.T("safety.restore.gate.body", result.Message),
             Loc.T("safety.restore.gate.title"),
             Loc.T("safety.restore.gate.continue"));

@@ -1,3 +1,4 @@
+﻿using System.Diagnostics;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using OpenClean.Models;
@@ -14,6 +15,9 @@ namespace OpenClean.Services.Privacy;
 /// Bestätigung (<see cref="RequiresConfirmation"/> = true). Scan liest read-only über
 /// eine temporäre Kopie; Clean löscht die Zeilen der ausgewählten Hosts per DELETE.
 /// Gesperrte Dateien (Browser offen) werden robust abgefangen – kein Absturz.
+///
+/// Hosts auf der Cookie-Whitelist (siehe <see cref="CookieWhitelistService"/>) werden sowohl
+/// beim Scan als auch beim Clean ausgenommen, damit dortige Anmeldungen erhalten bleiben.
 /// </summary>
 public sealed class CookiesProvider : IPrivacyProvider
 {
@@ -44,7 +48,10 @@ public sealed class CookiesProvider : IPrivacyProvider
 
     private static void ScanChromium(List<PrivacyItem> items, string browser, string dbPath)
     {
-        string? copy = BrowserDatabase.CreateReadCopy(dbPath);
+        // allowRawRead: bei laufendem Browser ist die Cookie-DB exklusiv gesperrt; nur über
+        // den Rohzugriff auf das Volume sind die Einträge sichtbar. Ohne das blieb die
+        // Kategorie leer, während das Inventar oben auf der Seite gefüllt war.
+        string? copy = BrowserDatabase.CreateReadCopy(dbPath, out _, allowRawRead: true);
         if (copy is null) return;
         try
         {
@@ -60,6 +67,7 @@ public sealed class CookiesProvider : IPrivacyProvider
                 string host = reader.IsDBNull(0) ? "" : reader.GetString(0);
                 long count = reader.IsDBNull(1) ? 0 : reader.GetInt64(1);
                 if (string.IsNullOrWhiteSpace(host)) continue;
+                if (CookieWhitelistService.Instance.Contains(host)) continue;
 
                 items.Add(new PrivacyItem
                 {
@@ -75,7 +83,10 @@ public sealed class CookiesProvider : IPrivacyProvider
 
     private static void ScanFirefox(List<PrivacyItem> items, string dbPath)
     {
-        string? copy = BrowserDatabase.CreateReadCopy(dbPath);
+        // allowRawRead: bei laufendem Browser ist die Cookie-DB exklusiv gesperrt; nur über
+        // den Rohzugriff auf das Volume sind die Einträge sichtbar. Ohne das blieb die
+        // Kategorie leer, während das Inventar oben auf der Seite gefüllt war.
+        string? copy = BrowserDatabase.CreateReadCopy(dbPath, out _, allowRawRead: true);
         if (copy is null) return;
         try
         {
@@ -91,6 +102,7 @@ public sealed class CookiesProvider : IPrivacyProvider
                 string host = reader.IsDBNull(0) ? "" : reader.GetString(0);
                 long count = reader.IsDBNull(1) ? 0 : reader.GetInt64(1);
                 if (string.IsNullOrWhiteSpace(host)) continue;
+                if (CookieWhitelistService.Instance.Contains(host)) continue;
 
                 items.Add(new PrivacyItem
                 {
@@ -105,6 +117,50 @@ public sealed class CookiesProvider : IPrivacyProvider
     }
 
     // ---- Clean --------------------------------------------------------------
+
+    /// <summary>
+    /// Namen der Browser, deren Cookie-DB gerade schreibgeschützt gesperrt ist (Browser läuft).
+    /// Anzeigen geht dank Rohzugriff trotzdem – LÖSCHEN aber nicht, denn dafür muss die
+    /// echte Datei schreibbar sein. Der Aufrufer warnt damit VOR der Bestätigung, statt den
+    /// Nutzer hinterher mit „0 gelöscht" stehen zu lassen. Wirft nie.
+    /// </summary>
+    public static IReadOnlyList<string> LockedBrowsers()
+    {
+        var locked = new List<string>();
+        try
+        {
+            foreach (var (browser, db) in ChromiumCookieDbs())
+            {
+                if (IsWriteLocked(db)) locked.Add(browser);
+            }
+
+            foreach (var db in FirefoxCookieDbs())
+            {
+                if (IsWriteLocked(db)) locked.Add("Firefox");
+            }
+        }
+        catch { /* nie werfen -> Teilergebnis genügt für die Warnung */ }
+
+        return locked
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(b => b, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Prüft, ob die Datei zum Schreiben geöffnet werden kann (ohne etwas zu ändern).</summary>
+    private static bool IsWriteLocked(string path)
+    {
+        try
+        {
+            using var _ = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+        catch { return false; }
+    }
 
     private int Clean(IEnumerable<PrivacyItem> selected)
     {
@@ -126,6 +182,7 @@ public sealed class CookiesProvider : IPrivacyProvider
 
                 foreach (var handle in group)
                 {
+                    if (CookieWhitelistService.Instance.Contains(handle.Host)) continue;
                     try
                     {
                         using var cmd = conn.CreateCommand();
@@ -141,7 +198,11 @@ public sealed class CookiesProvider : IPrivacyProvider
 
                 tx.Commit();
             }
-            catch { /* DB gesperrt (Browser offen) -> ganze DB überspringen, kein Absturz */ }
+            catch (Exception ex)
+            {
+                // DB gesperrt (Browser offen) -> ganze DB überspringen, kein Absturz.
+                Trace.WriteLine($"[OpenClean] Cookies löschen in '{group.Key}' fehlgeschlagen: {ex.Message}");
+            }
         }
 
         return deleted;

@@ -27,6 +27,15 @@ public static class PremiumContract
 
     /// <summary>Feature-Schlüssel: Batch-Deinstallation (mehrere Programme auf einmal).</summary>
     public const string FeatureBatchUninstall = "batch-uninstall";
+
+    /// <summary>Feature-Schlüssel: Detailwerte der Datenträger-Gesundheit (SMART-Rohwerte).</summary>
+    public const string FeatureSmartDetails = "disk-health-details";
+
+    /// <summary>Feature-Schlüssel: Ähnlichkeits-Duplikatsuche (visuell ähnliche Bilder, Perceptual-Hash).</summary>
+    public const string FeatureFuzzyDuplicates = "fuzzy_duplicates";
+
+    /// <summary>Feature-Schlüssel: Sicheres Löschen (mehrfaches Überschreiben, unwiderruflich).</summary>
+    public const string FeatureSecureDelete = "secure_delete";
 }
 
 /// <summary>Verifizierte Lizenzdaten, die die App dem Modul beim Initialisieren übergibt.</summary>

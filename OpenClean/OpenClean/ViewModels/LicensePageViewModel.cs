@@ -1,7 +1,6 @@
-using System.Windows;
 using OpenClean.Contracts;
 using OpenClean.Services.Licensing;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -16,12 +15,18 @@ public sealed class LicensePageViewModel : ViewModelBase
     private bool _isBusy;
     private string? _statusKey;
 
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _ui;
+
     public RelayCommand ActivateCommand { get; }
     public RelayCommand BuyCommand { get; }
     public AsyncRelayCommand DeactivateCommand { get; }
 
-    public LicensePageViewModel()
+    public LicensePageViewModel(IDialogService? dialogs = null, IUiDispatcher? ui = null)
     {
+        _dialogs = dialogs ?? DialogService.Default;
+        _ui = ui ?? UiDispatcher.Default;
+
         ActivateCommand = new RelayCommand(_ => Activate(), _ => !IsBusy);
         BuyCommand = new RelayCommand(_ => LicenseViewModel.OpenBuyPage());
         DeactivateCommand = new AsyncRelayCommand(_ => DeactivateAsync(), _ => !IsBusy && HasLicense);
@@ -29,9 +34,8 @@ public sealed class LicensePageViewModel : ViewModelBase
         // Lizenzwechsel (Aktivierung, Hintergrund-Refresh, Freigabe) -> Anzeige neu berechnen.
         PremiumService.Instance.Changed += (_, _) =>
         {
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher is null || dispatcher.CheckAccess()) Refresh();
-            else dispatcher.InvokeAsync(Refresh);
+            if (_ui.CheckAccess()) Refresh();
+            else _ui.Post(Refresh);
         };
     }
 
@@ -98,7 +102,7 @@ public sealed class LicensePageViewModel : ViewModelBase
     /// <summary>Öffnet den bestehenden Aktivierungsdialog (Schlüssel-Eingabe + Modul-Download).</summary>
     private void Activate()
     {
-        ActivationDialog.Show(Application.Current?.MainWindow);
+        _dialogs.ActivateLicense();
         // Erfolgsfall deckt bereits das Changed-Ereignis ab; das hier fängt den Abbruch ab.
         Refresh();
     }
@@ -110,8 +114,7 @@ public sealed class LicensePageViewModel : ViewModelBase
     /// </summary>
     private async Task DeactivateAsync()
     {
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("license.deactivate.confirm.body"),
             Loc.T("license.deactivate.confirm.title"),
             Loc.T("license.deactivate.confirm.action"));
@@ -133,8 +136,7 @@ public sealed class LicensePageViewModel : ViewModelBase
 
         if (error is LicenseApiError.Network or LicenseApiError.RateLimited)
         {
-            bool localOnly = ConfirmDialog.Show(
-                Application.Current?.MainWindow,
+            bool localOnly = _dialogs.ConfirmThemed(
                 Loc.T("license.deactivate.offline.body"),
                 Loc.T("license.deactivate.offline.title"),
                 Loc.T("license.deactivate.confirm.action"));

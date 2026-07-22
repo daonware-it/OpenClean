@@ -260,46 +260,9 @@ public sealed class StartupService
 
         // Heuristik: Segment zwischen erstem '.' und '_'. Sieht es wie ein Hash aus,
         // stattdessen die TaskId als Basis nehmen.
-        string segment = PackageNameSegment(pfn);
-        string basis = LooksLikeHash(segment) ? taskId : segment;
-        return Prettify(basis);
-    }
-
-    /// <summary>Segment zwischen erstem '.' und '_' (Paketname), Fallback: Teil vor '_'.</summary>
-    private static string PackageNameSegment(string packageFamilyName)
-    {
-        string beforeUnderscore = packageFamilyName.Split('_', 2)[0];
-        int dot = beforeUnderscore.IndexOf('.');
-        if (dot >= 0 && dot + 1 < beforeUnderscore.Length)
-            return beforeUnderscore[(dot + 1)..];
-        return beforeUnderscore;
-    }
-
-    /// <summary>True, wenn der Text wie ein Hash aussieht: rein hexadezimal (≥6) oder nur Ziffern.</summary>
-    private static bool LooksLikeHash(string text)
-        => !string.IsNullOrEmpty(text)
-           && (System.Text.RegularExpressions.Regex.IsMatch(text, "^[0-9A-Fa-f]{6,}$")
-               || text.All(char.IsDigit));
-
-    /// <summary>
-    /// Fügt vor Großbuchstaben Leerzeichen ein ("SpotifyMusic" → "Spotify Music") und
-    /// entfernt ein angehängtes "Desktop"/"App".
-    /// </summary>
-    private static string Prettify(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return name;
-
-        // Nur bei "CamelCase" ohne vorhandene Trennzeichen splitten.
-        if (!name.Contains(' ') && !name.Contains('-') && !name.Contains('.'))
-            name = System.Text.RegularExpressions.Regex.Replace(name, "(?<=[a-z0-9])(?=[A-Z])", " ");
-
-        foreach (var suffix in new[] { " Desktop", " App" })
-        {
-            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) && name.Length > suffix.Length)
-                name = name[..^suffix.Length];
-        }
-
-        return name.Trim();
+        string segment = StartupDisplayName.PackageNameSegment(pfn);
+        string basis = StartupDisplayName.LooksLikeHash(segment) ? taskId : segment;
+        return StartupDisplayName.Prettify(basis);
     }
 
     /// <summary>
@@ -525,34 +488,10 @@ public sealed class StartupService
 
     // ---- Hilfsfunktionen ----------------------------------------------------
 
-    /// <summary>
-    /// Zerlegt einen Autostart-Befehl in Programm und Argumente. Umgebungsvariablen werden
-    /// expandiert; ein quotierter Pfad darf Leerzeichen enthalten. Leerer EXE-Teil, wenn der
-    /// Befehl leer ist.
-    /// </summary>
-    public static (string exe, string arguments) SplitCommand(string command)
-    {
-        if (string.IsNullOrWhiteSpace(command)) return ("", "");
-        command = Environment.ExpandEnvironmentVariables(command).Trim();
-
-        if (command.StartsWith('"'))
-        {
-            int end = command.IndexOf('"', 1);
-            return end > 0
-                ? (command.Substring(1, end - 1), command[(end + 1)..].Trim())
-                : (command.Trim('"'), "");
-        }
-
-        int space = command.IndexOf(' ');
-        return space > 0
-            ? (command[..space], command[(space + 1)..].Trim())
-            : (command, "");
-    }
-
     /// <summary>Extrahiert den EXE-Pfad aus einem (evtl. quotierten, mit Argumenten versehenen) Befehl.</summary>
     private static string? ResolveExecutable(string command)
     {
-        var (exe, _) = SplitCommand(command);
+        var (exe, _) = CommandLine.Split(command);
         return exe.Length > 0 && File.Exists(exe) ? exe : null;
     }
 

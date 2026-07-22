@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -24,9 +25,18 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 }
 
 /// <summary>
+/// Gemeinsame Oberfläche der Relay-Commands: erlaubt es, eine Menge von Commands generisch
+/// neu bewerten zu lassen (z. B. wenn sich der Busy-Zustand ändert), ohne den konkreten Typ zu kennen.
+/// </summary>
+public interface IRelayCommand : ICommand
+{
+    void RaiseCanExecuteChanged();
+}
+
+/// <summary>
 /// Einfacher ICommand, synchron. Für asynchrone Aktionen mit <see cref="AsyncRelayCommand"/>.
 /// </summary>
-public sealed class RelayCommand : ICommand
+public sealed class RelayCommand : ICommand, IRelayCommand
 {
     private readonly Action<object?> _execute;
     private readonly Func<object?, bool>? _canExecute;
@@ -47,7 +57,7 @@ public sealed class RelayCommand : ICommand
 /// <summary>
 /// ICommand für async Handler; blockiert Mehrfach-Ausführung während eine Aktion läuft.
 /// </summary>
-public sealed class AsyncRelayCommand : ICommand
+public sealed class AsyncRelayCommand : ICommand, IRelayCommand
 {
     private readonly Func<object?, Task> _execute;
     private readonly Func<object?, bool>? _canExecute;
@@ -73,10 +83,9 @@ public sealed class AsyncRelayCommand : ICommand
         }
         catch (Exception ex)
         {
-            // async void: eine unbehandelte Ausnahme würde die App beenden.
-            System.Windows.MessageBox.Show(
-                OpenClean.Services.Localization.Loc.T("error.unexpected", ex.Message), "OpenClean",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            // async void: eine unbehandelte Ausnahme würde die App beenden. Der Fehlerdialog
+            // läuft über den zentralen Dialog-Service (kapselt MessageBox, testbar ersetzbar).
+            DialogService.Default.ShowError(Loc.T("error.unexpected", ex.Message));
         }
         finally
         {

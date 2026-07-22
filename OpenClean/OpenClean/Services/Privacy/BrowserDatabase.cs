@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using Microsoft.Data.Sqlite;
 
@@ -74,30 +75,85 @@ internal static class BrowserDatabase
 
     // ---- Gefahrloses Lesen einer evtl. gesperrten DB ------------------------
 
+    /// <summary>Warum eine Lesekopie nicht zustande kam (bzw. <see cref="Ok"/>).</summary>
+    public enum ReadCopyResult
+    {
+        /// <summary>Kopie steht bereit.</summary>
+        Ok,
+        /// <summary>Quelldatei existiert nicht (Browser/Profil nicht vorhanden).</summary>
+        Missing,
+        /// <summary>Quelle ist exklusiv gesperrt – der Browser läuft (Chromium: FileShare.None).</summary>
+        Locked,
+        /// <summary>Sonstiger Fehler (Rechte, Datenträger, …).</summary>
+        Failed
+    }
+
     /// <summary>
     /// Erstellt eine temporäre Kopie der DB (inkl. -wal/-shm, falls vorhanden), damit
     /// auch bei geöffnetem Browser gelesen werden kann. Liefert den Pfad der Kopie
     /// oder null, wenn die DB nicht existiert/nicht kopierbar ist. Der Aufrufer muss
     /// die Kopie anschließend per <see cref="DeleteReadCopy"/> entfernen.
     /// </summary>
-    public static string? CreateReadCopy(string dbPath)
+    public static string? CreateReadCopy(string dbPath) => CreateReadCopy(dbPath, out _);
+
+    /// <summary>
+    /// Wie <see cref="CreateReadCopy(string)"/>, meldet über <paramref name="result"/> aber den
+    /// Grund eines Fehlschlags. Wichtig: Chromium hält <c>Cookies</c> exklusiv geöffnet, solange
+    /// der Browser läuft – dann ist KEIN Lesen möglich und der Aufrufer muss das dem Nutzer
+    /// zeigen, statt still ein leeres Ergebnis zu liefern.
+    /// </summary>
+    /// <param name="allowRawRead">
+    /// Wenn <c>true</c>, wird eine exklusiv gesperrte Datei per Rohzugriff auf das Volume
+    /// gelesen (einziger Weg an Chromes Cookie-DB bei laufendem Browser). Bewusst opt-in:
+    /// der Zugriff braucht Adminrechte und ist nur dort gerechtfertigt, wo der Nutzer wartet.
+    /// </param>
+    public static string? CreateReadCopy(string dbPath, out ReadCopyResult result, bool allowRawRead = false)
     {
+        string? tempDir = null;
         try
         {
-            if (!File.Exists(dbPath)) return null;
+            if (!File.Exists(dbPath))
+            {
+                result = ReadCopyResult.Missing;
+                return null;
+            }
 
-            string tempDir = Path.Combine(Path.GetTempPath(), "OpenClean", Guid.NewGuid().ToString("N"));
+            tempDir = Path.Combine(Path.GetTempPath(), "OpenClean", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
             string copyMain = Path.Combine(tempDir, Path.GetFileName(dbPath));
 
-            CopyIfExists(dbPath, copyMain);
-            CopyIfExists(dbPath + "-wal", copyMain + "-wal");
-            CopyIfExists(dbPath + "-shm", copyMain + "-shm");
+            // Die Hauptdatei ist Pflicht: schlägt sie fehl, darf KEIN Pfad zurückkommen –
+            // sonst öffnet der Aufrufer eine nicht existierende Datei und zählt still 0 Zeilen.
+            result = CopyShared(dbPath, copyMain);
+
+            // Gesperrt (laufender Browser) -> zweiter Versuch per Rohzugriff auf das Volume.
+            // Bewusst KEINE VSS-Schattenkopie: deren Freigabe zwingt Windows, alle älteren
+            // Schattenkopien zu löschen – das vernichtet die Wiederherstellungspunkte des
+            // Nutzers (volsnap-Ereignis 95). Der Rohzugriff verändert am System nichts.
+            if (result == ReadCopyResult.Locked && allowRawRead && RawVolumeReader.IsAvailable)
+            {
+                Trace.WriteLine($"[OpenClean] '{dbPath}' gesperrt – versuche Rohzugriff auf das Volume.");
+                if (RawVolumeReader.TryCopyRaw(dbPath, copyMain))
+                    result = ReadCopyResult.Ok;
+            }
+
+            if (result != ReadCopyResult.Ok)
+            {
+                DeleteReadCopy(copyMain);
+                return null;
+            }
+
+            // Nebendateien sind optional (best effort).
+            if (File.Exists(dbPath + "-wal")) CopyShared(dbPath + "-wal", copyMain + "-wal");
+            if (File.Exists(dbPath + "-shm")) CopyShared(dbPath + "-shm", copyMain + "-shm");
 
             return copyMain;
         }
-        catch
+        catch (Exception ex)
         {
+            Trace.WriteLine($"[OpenClean] CreateReadCopy('{dbPath}') unerwartet fehlgeschlagen: {ex.Message}");
+            if (tempDir is not null) DeleteReadCopy(Path.Combine(tempDir, "x"));
+            result = ReadCopyResult.Failed;
             return null;
         }
     }
@@ -115,14 +171,32 @@ internal static class BrowserDatabase
         catch { /* Aufräumen best effort – Temp-Ordner wird ohnehin vom OS bereinigt */ }
     }
 
-    private static void CopyIfExists(string source, string dest)
+    /// <summary>
+    /// Kopiert eine (evtl. geöffnete) Datei. Anders als <c>File.Copy</c> wird die Quelle mit
+    /// <c>FileShare.ReadWrite | FileShare.Delete</c> geöffnet – so lässt sich mitlesen, solange
+    /// der Halter überhaupt Sharing erlaubt (Firefox tut das). Chromium erlaubt es für
+    /// <c>Cookies</c> nicht; dann kommt <see cref="ReadCopyResult.Locked"/> zurück.
+    /// </summary>
+    private static ReadCopyResult CopyShared(string source, string dest)
     {
         try
         {
-            if (File.Exists(source))
-                File.Copy(source, dest, overwrite: true);
+            using var src = new FileStream(source, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+            src.CopyTo(dst);
+            return ReadCopyResult.Ok;
         }
-        catch { /* gesperrte Nebendatei -> überspringen, Hauptdatei genügt meist */ }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Trace.WriteLine($"[OpenClean] '{source}' ist gesperrt/nicht lesbar: {ex.Message}");
+            return ReadCopyResult.Locked;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[OpenClean] Kopieren von '{source}' fehlgeschlagen: {ex.Message}");
+            return ReadCopyResult.Failed;
+        }
     }
 
     // ---- Zeitstempel --------------------------------------------------------

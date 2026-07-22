@@ -1,10 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Windows;
 using OpenClean.Models;
 using OpenClean.Services;
 using OpenClean.Services.Safety;
-using OpenClean.Views;
+using OpenClean.Services.UI;
 
 namespace OpenClean.ViewModels;
 
@@ -24,6 +23,8 @@ public sealed class BackupHistoryViewModel : ViewModelBase
     private bool _isBusy;
     private string _statusText = "";
 
+    private readonly IDialogService _dialogs;
+
     public ObservableCollection<BackupHistoryItemViewModel> Sessions { get; } = new();
 
     /// <summary>Vorhandene Windows-Wiederherstellungspunkte (jüngster zuerst).</summary>
@@ -37,20 +38,29 @@ public sealed class BackupHistoryViewModel : ViewModelBase
     /// <summary>Entfernt alle Wiederherstellungspunkte bis auf den jüngsten.</summary>
     public RelayCommand DeleteOldRestorePointsCommand { get; }
 
-    public BackupHistoryViewModel()
+    public BackupHistoryViewModel(IDialogService? dialogs = null)
     {
-        RefreshCommand = new RelayCommand(_ => Refresh(), _ => !IsBusy);
+        _dialogs = dialogs ?? DialogService.Default;
+
+        RefreshCommand = new RelayCommand(_ => { _ = RefreshAsync(); }, _ => !IsBusy);
         OpenSystemRestoreCommand = new RelayCommand(_ => OpenSystemRestore());
         DeleteOldRestorePointsCommand = new RelayCommand(
             _ => DeleteOldRestorePoints(), _ => !IsBusy && HasDeletableRestorePoints);
-        Refresh();
+        _ = RefreshAsync();
     }
 
-    /// <summary>Lädt die Liste der gesicherten Durchläufe neu und stößt das Laden der Punkte an.</summary>
-    public void Refresh()
+    /// <summary>
+    /// Lädt die Liste der gesicherten Durchläufe neu und stößt das Laden der Punkte an. Das
+    /// Auflisten liest Verzeichnisse und Manifest-Dateien von der Platte – deshalb im Hintergrund,
+    /// damit das Öffnen des Bereichs und jeder Refresh den UI-Thread nicht blockieren.
+    /// </summary>
+    public async Task RefreshAsync()
     {
+        IReadOnlyList<BackupManifest> manifests =
+            await Task.Run(() => BackupService.Instance.ListSessions());
+
         Sessions.Clear();
-        foreach (var manifest in BackupService.Instance.ListSessions())
+        foreach (var manifest in manifests)
         {
             string id = manifest.Id;
             var restore = new RelayCommand(_ => RestoreSession(id), _ => !IsBusy);
@@ -63,7 +73,7 @@ public sealed class BackupHistoryViewModel : ViewModelBase
             ? Loc.T("safety.history.empty")
             : Loc.T("safety.history.count", Sessions.Count);
 
-        _ = RefreshRestorePointsAsync();
+        await RefreshRestorePointsAsync();
     }
 
     /// <summary>
@@ -72,8 +82,17 @@ public sealed class BackupHistoryViewModel : ViewModelBase
     /// </summary>
     private async Task RefreshRestorePointsAsync()
     {
-        IReadOnlyList<RestorePointInfo> points =
-            await Task.Run(() => RestorePointService.Instance.List());
+        IReadOnlyList<RestorePointInfo> points;
+        try
+        {
+            // WMI/VSS-Abfrage kann fehlschlagen (Dienst deaktiviert, Rechte) – ohne try/catch
+            // würde die verworfene Task eine unbeobachtete Ausnahme werfen.
+            points = await Task.Run(() => RestorePointService.Instance.List());
+        }
+        catch
+        {
+            points = Array.Empty<RestorePointInfo>();
+        }
 
         RestorePoints.Clear();
         foreach (var p in points)
@@ -179,7 +198,7 @@ public sealed class BackupHistoryViewModel : ViewModelBase
 
         UndoResult result = await Task.Run(() => BackupService.Instance.Restore(id));
 
-        Refresh();
+        await RefreshAsync();
         IsBusy = false;
         StatusText = result.Failed > 0
             ? Loc.T("safety.undo.partial", result.Restored, result.Failed)
@@ -210,8 +229,7 @@ public sealed class BackupHistoryViewModel : ViewModelBase
     {
         if (IsBusy) return;
 
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("safety.points.delete.body"),
             Loc.T("safety.points.delete.title"),
             Loc.T("safety.points.delete.action"));
@@ -231,8 +249,7 @@ public sealed class BackupHistoryViewModel : ViewModelBase
         if (IsBusy || !HasDeletableRestorePoints) return;
 
         int count = RestorePoints.Count - 1;
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("safety.points.deleteOld.body", count),
             Loc.T("safety.points.deleteOld.title"),
             Loc.T("safety.points.deleteOld.action"));
@@ -248,17 +265,17 @@ public sealed class BackupHistoryViewModel : ViewModelBase
         await RefreshRestorePointsAsync();
     }
 
-    private void DeleteSession(string id)
+    private async void DeleteSession(string id)
     {
-        bool confirmed = ConfirmDialog.Show(
-            Application.Current?.MainWindow,
+        bool confirmed = _dialogs.ConfirmThemed(
             Loc.T("safety.history.delete.body"),
             Loc.T("safety.history.delete.title"),
             Loc.T("safety.history.delete.action"));
         if (!confirmed) return;
 
-        BackupService.Instance.DeleteSession(id);
-        Refresh();
+        // Löschen eines Verzeichnisbaums von der Platte im Hintergrund, damit die UI nicht hängt.
+        await Task.Run(() => BackupService.Instance.DeleteSession(id));
+        await RefreshAsync();
     }
 
     /// <summary>Aktualisiert nach einem Sprachwechsel alle berechneten Texte.</summary>
