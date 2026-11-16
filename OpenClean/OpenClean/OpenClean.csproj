@@ -44,7 +44,7 @@
 
     <ItemGroup>
         <!-- SQLite-Zugriff für Browser-Datenbanken (Verlauf, Cookies) -->
-        <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0" />
         <!-- Native SQLite-Binärdatei auf den gepatchten Build heben; behebt
              GHSA-2m69-gcr7-jv3q (SQLitePCLRaw.lib.e_sqlite3 <= 2.1.11 ist
              verwundbar). Der verwaltete Stack (core/provider) bleibt bei der von
