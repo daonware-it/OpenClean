@@ -53,7 +53,7 @@
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
         <!-- WMI-Zugriff für Windows-Systemwiederherstellungspunkte (SystemRestore-Klasse
              in root\default). Nur auf Windows verfügbar – passt zum net10.0-windows-Ziel. -->
-        <PackageReference Include="System.Management" Version="10.0.0" />
+        <PackageReference Include="System.Management" Version="11.0.0" />
     </ItemGroup>
 
     <ItemGroup>
