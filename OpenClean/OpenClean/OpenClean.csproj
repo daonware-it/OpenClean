@@ -50,7 +50,7 @@
              verwundbar). Der verwaltete Stack (core/provider) bleibt bei der von
              Microsoft.Data.Sqlite validierten 2.1.x-Linie; die native Lib ist
              ABI-stabil und daher unabhängig aktualisierbar. -->
-        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
         <!-- WMI-Zugriff für Windows-Systemwiederherstellungspunkte (SystemRestore-Klasse
              in root\default). Nur auf Windows verfügbar – passt zum net10.0-windows-Ziel. -->
         <PackageReference Include="System.Management" Version="10.0.0" />
